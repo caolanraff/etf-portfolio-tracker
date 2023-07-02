@@ -9,6 +9,7 @@ import pdfrw
 import os
 from fpdf import FPDF
 import math
+import configparser
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--timeframe', type=str, help='timeframe [MTD|YTD|adhoc]')
@@ -37,6 +38,9 @@ if end_date == '':
     end_date = datetime(now.year, now.month, now.day-1)
 else:
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
+
+config = configparser.ConfigParser()
+config.read(args.path + '/config/config.ini')
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -119,7 +123,7 @@ def calculate_all_portfolio_pnl():
 
 ### Save dataframe to PDF
 def save_dataframe_to_pdf(df, file):
-    fig, ax =plt.subplots(figsize=(12,4))
+    fig, ax = plt.subplots(figsize=(12,4))
     ax.axis('tight')
     ax.axis('off')
     table = ax.table(cellText=df.values, colLabels=df.columns, loc='center')
@@ -137,7 +141,7 @@ def save_dataframe_to_pdf(df, file):
 def create_title_page(aum):
     pdf_output = FPDF()
     pdf_output.add_page()
-    title = 'Prestige Worldwide'
+    title = config.get('TitlePage', 'title')
     subtitle = end_date.strftime('%B %Y') + ' Meeting'
     aum = 'AUM: ' + aum
     pdf_output.set_font('Arial', 'B', 36)
@@ -146,8 +150,10 @@ def create_title_page(aum):
     pdf_output.cell(0, 20, subtitle, 0, 1, 'C')
     pdf_output.set_font('Arial', '', 16)
     pdf_output.cell(0, 20, aum, 0, 1, 'C')
-    image_file = args.path + '/data/input/image.png'
-    pdf_output.image(image_file, x=55, y=150, w=100, h=100)
+    image = config.get('TitlePage', 'image')
+    if image != '':
+        image_file = args.path + '/data/input/' + image
+        pdf_output.image(image_file, x=55, y=150, w=100, h=100)
     pdf_output.output('title.pdf')
 
 
@@ -180,8 +186,8 @@ def get_summary(result_dict, save_to_file):
     summary = summary.sort_values(by=timeframe, ascending=False)
     summary[timeframe] = summary[timeframe].round(3)
     summary = summary.reset_index(drop=True)
-    summary.loc[0, 'Notes'] = 'Winner'
-    summary.loc[summary.index[-1], 'Notes'] = 'Cheese Duty'
+    summary.loc[0, 'Notes'] = config.get('SummaryPage', 'best')
+    summary.loc[summary.index[-1], 'Notes'] = config.get('SummaryPage', 'worst')
     summary['Notes'] = summary['Notes'].fillna('')
 
     if save_to_file:
@@ -331,7 +337,7 @@ def comp():
     print(f"[INFO] Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
-    print('[INFO] Prestige Worldwide AUM: ' + aum)
+    print('[INFO] AUM: ' + aum)
     get_summary(res_dict, False)
     plot_performance_charts(res_dict, False)
 
