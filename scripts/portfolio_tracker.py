@@ -124,7 +124,7 @@ def calculate_all_portfolio_pnl():
 
 
 ### Save dataframe to PDF
-def save_dataframe_to_pdf(df, file):
+def save_dataframe_to_pdf(df, file, highlight_columns=None, thresholds=None, operators=None):
     fig, ax = plt.subplots(figsize=(12,4))
     ax.axis('tight')
     ax.axis('off')
@@ -134,6 +134,18 @@ def save_dataframe_to_pdf(df, file):
             cell.set_text_props(fontweight='bold', ha='left')
         else:
             cell.set_text_props(ha='left')
+            if highlight_columns and thresholds and operators:
+                for i, col_name in enumerate(highlight_columns):
+                    try:
+                        col_index = df.columns.get_loc(col_name)
+                    except KeyError:
+                        raise ValueError(f"Column '{col_name}' not found in dataframe")
+                    if col == col_index:
+                        cell_value = float(cell.get_text().get_text())
+                        if operators[i] == ">" and cell_value > thresholds[i]:
+                            cell.set_facecolor('red')
+                        elif operators[i] == "<" and cell_value < thresholds[i]:
+                            cell.set_facecolor('red')
     pp = PdfPages(file)
     pp.savefig(fig, bbox_inches='tight')
     pp.close()
@@ -308,20 +320,28 @@ def plot_pie_charts(result_dict):
 def get_metrics(result_dict):
     print('[INFO] Getting metrics')
     result_df = pd.DataFrame()
+    metrics = ['Beta (5Y Monthly)', 'Expense Ratio (net)', 'PE Ratio (TTM)', 'Yield', 'YTD Daily Total Return']
 
     for key, df in result_dict.items():
         tickers = list(df['ticker'].unique())
         for ticker in tickers:
             res = si.get_quote_table(ticker)
-            keys = ['Beta (5Y Monthly)', 'Expense Ratio (net)', 'PE Ratio (TTM)', 'YTD Daily Total Return', 'Yield']
-            my_dict = {k: v for k, v in res.items() if k in keys}
+            my_dict = {k: v for k, v in res.items() if k in metrics}
             df = pd.DataFrame([my_dict])
             df['Investor'] = key
             df['Ticker'] = ticker
-            df = df[['Investor', 'Ticker'] + list(df.columns.difference(['Investor', 'Ticker']))]
             result_df = result_df.append(df, ignore_index=True)
 
-    save_dataframe_to_pdf(result_df, "metrics.pdf")
+    result_df['Expense Ratio (net)'] = result_df['Expense Ratio (net)'].str.rstrip('%')
+    result_df['Yield'] = result_df['Yield'].str.rstrip('%')
+    result_df['YTD Daily Total Return'] = result_df['YTD Daily Total Return'].str.rstrip('%')
+    result_df = result_df[['Investor', 'Ticker'] + metrics]
+
+    save_dataframe_to_pdf(result_df, "metrics.pdf",
+                          metrics,
+                          [1.2, 0.5, 30, 0.7, -5],
+                          [">", ">", ">", "<", "<"]
+                          )
 
 
 ### Merge pdf files
