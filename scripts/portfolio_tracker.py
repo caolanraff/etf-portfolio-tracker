@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
@@ -111,7 +112,7 @@ def calculate_portfolio_pnl(file_path, sheet):
 def calculate_all_portfolio_pnl():
     print('[INFO] Calculating portfolio PnLs')
     result_dict = {}
-    file = args.path + '/data/input/portfolios.xlsx'
+    file = args.path + '/data/input/' + config.get('Input', 'file')
     sheets = pd.ExcelFile(file).sheet_names
     for sheet in sheets:
         res = calculate_portfolio_pnl(file, sheet)
@@ -142,7 +143,7 @@ def save_dataframe_to_pdf(df, file):
 def create_title_page(aum):
     pdf_output = FPDF()
     pdf_output.add_page()
-    title = config.get('TitlePage', 'title')
+    title = config.get('Text', 'title')
     subtitle = end_date.strftime('%B %Y') + ' Meeting'
     aum = 'AUM: ' + aum
     pdf_output.set_font('Arial', 'B', 36)
@@ -151,7 +152,7 @@ def create_title_page(aum):
     pdf_output.cell(0, 20, subtitle, 0, 1, 'C')
     pdf_output.set_font('Arial', '', 16)
     pdf_output.cell(0, 20, aum, 0, 1, 'C')
-    image = config.get('TitlePage', 'image')
+    image = config.get('Input', 'image')
     if image != '':
         image_file = args.path + '/data/input/' + image
         pdf_output.image(image_file, x=55, y=150, w=100, h=100)
@@ -187,8 +188,8 @@ def get_summary(result_dict, save_to_file):
     summary = summary.sort_values(by=timeframe, ascending=False)
     summary[timeframe] = summary[timeframe].round(3)
     summary = summary.reset_index(drop=True)
-    summary.loc[0, 'Notes'] = config.get('SummaryPage', 'best')
-    summary.loc[summary.index[-1], 'Notes'] = config.get('SummaryPage', 'worst')
+    summary.loc[0, 'Notes'] = config.get('Text', 'best')
+    summary.loc[summary.index[-1], 'Notes'] = config.get('Text', 'worst')
     summary['Notes'] = summary['Notes'].fillna('')
 
     if save_to_file:
@@ -283,7 +284,7 @@ def plot_pie_charts(result_dict):
     num_rows = math.ceil(n / num_cols)
 
     fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(15, 10))
-    if not isinstance(axs[0], list):
+    if not isinstance(axs[0], np.ndarray):
         axs = [[axs[i * num_cols + j] for j in range(num_cols)] for i in range(num_rows)]
     plt.subplots_adjust(wspace=0.3, hspace=0.5)
 
@@ -357,7 +358,7 @@ def report():
     plot_pie_charts(res_dict)
     get_metrics(res_dict)
     merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf', 'metrics.pdf'],
-               args.path + '/data/output/report.pdf')
+               args.path + '/data/output/' + config.get('Output', 'file'))
 
 
 if __name__ == "__main__":
