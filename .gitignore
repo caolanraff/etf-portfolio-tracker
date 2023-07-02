@@ -1,1 +1,5 @@
 .DS_Store
+config/prestige_worldwide.ini
+data/input/Portfolio_Tracker.xlsx
+data/input/image.png
+data/output/Prestige_Worldwide.pdf
