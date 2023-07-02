@@ -14,6 +14,7 @@ parser.add_argument('--timeframe', type=str, help='timeframe [MTD|YTD|adhoc]')
 parser.add_argument('--start', default='', type=str, help='start date [YYYY-MM-DD]')
 parser.add_argument('--end', default='', type=str, help='end date [YYYY-MM-DD]')
 parser.add_argument('--report', action='store_true', help='generate PDF report')
+parser.add_argument('--path', default='./', type=str, help='directory path')
 args = parser.parse_args()
 
 timeframe = args.timeframe
@@ -39,12 +40,6 @@ else:
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.set_option('display.width', None)
-
-print("[INFO] Running report for " + timeframe + " (" + str(start_date) + " - " + str(end_date) + ")")
-
-home = '/Users/caolanraff/Desktop/'
-file = home + 'Portfolio_Tracker.xlsx'
-sheets = pd.ExcelFile(file).sheet_names
 
 
 ### calculate pnl
@@ -110,6 +105,8 @@ def calculate_portfolio_pnl(file_path, sheet):
 def calculate_all_portfolio_pnl():
     print('[INFO] Calculating portfolio PnLs')
     result_dict = {}
+    file = args.path + '/data/input/portfolios.xlsx'
+    sheets = pd.ExcelFile(file).sheet_names
     for sheet in sheets:
         res = calculate_portfolio_pnl(file, sheet)
         if res is None:
@@ -148,7 +145,7 @@ def create_title_page(aum):
     pdf_output.cell(0, 20, subtitle, 0, 1, 'C')
     pdf_output.set_font('Arial', '', 16)
     pdf_output.cell(0, 20, aum, 0, 1, 'C')
-    image_file = 'image.png'
+    image_file = args.path + '/data/input/image.png'
     pdf_output.image(image_file, x=55, y=150, w=100, h=100)
     pdf_output.output('title.pdf')
 
@@ -319,6 +316,7 @@ def merge_pdfs(file_list, output_file):
 
 ### main
 def comp():
+    print("[INFO] Running report for " + timeframe + " (" + str(start_date) + " - " + str(end_date) + ")")
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
     print('[INFO] Prestige Worldwide AUM: ' + aum)
@@ -327,6 +325,7 @@ def comp():
 
 
 def report():
+    print("[INFO] Running report for " + timeframe + " (" + str(start_date) + " - " + str(end_date) + ")")
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
     create_title_page(aum)
@@ -337,7 +336,7 @@ def report():
     plot_pie_charts(res_dict)
     get_metrics(res_dict)
     merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf', 'metrics.pdf'],
-               home + 'prestige_worldwide.pdf')
+               args.path + '/data/output/report.pdf')
 
 
 if __name__ == "__main__":
