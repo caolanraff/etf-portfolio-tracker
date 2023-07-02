@@ -8,6 +8,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import pdfrw
 import os
 from fpdf import FPDF
+import math
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--timeframe', type=str, help='timeframe [MTD|YTD|adhoc]')
@@ -268,15 +269,26 @@ def best_and_worst(result_dict):
 ### pie chart
 def plot_pie_charts(result_dict):
     print('[INFO] Plotting ETF weightings')
-    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(15, 10))
+    n = len(result_dict)
+    num_cols = 3
+    num_rows = math.ceil(n / num_cols)
+
+    fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(15, 10))
+    if not isinstance(axs[0], list):
+        axs = [[axs[i * num_cols + j] for j in range(num_cols)] for i in range(num_rows)]
     plt.subplots_adjust(wspace=0.3, hspace=0.5)
 
     for i, (key, df) in enumerate(result_dict.items()):
-        row = i // 3
-        col = i % 3
+        row = i // num_cols
+        col = i % num_cols
         df = df.loc[df['date'] == end_date]
-        axs[row, col].pie(df['notional_value'], labels=df['ticker'], autopct='%1.1f%%', radius=1.2)
-        axs[row, col].set_title(key, y=1.1, fontdict={'fontsize': 14, 'fontweight': 'bold'})
+        axs[row][col].pie(df['notional_value'], labels=df['ticker'], autopct='%1.1f%%', radius=1.2)
+        axs[row][col].set_title(key, y=1.1, fontdict={'fontsize': 14, 'fontweight': 'bold'})
+
+    for i in range(n, num_rows * num_cols):
+        row = i // num_cols
+        col = i % num_cols
+        fig.delaxes(axs[row][col])
 
     plt.suptitle('ETF Weightings')
     plt.savefig('weightings.pdf')
@@ -316,7 +328,7 @@ def merge_pdfs(file_list, output_file):
 
 ### main
 def comp():
-    print("[INFO] Running report for " + timeframe + " (" + str(start_date) + " - " + str(end_date) + ")")
+    print(f"[INFO] Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
     print('[INFO] Prestige Worldwide AUM: ' + aum)
@@ -325,7 +337,7 @@ def comp():
 
 
 def report():
-    print("[INFO] Running report for " + timeframe + " (" + str(start_date) + " - " + str(end_date) + ")")
+    print(f"[INFO] Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
     create_title_page(aum)
