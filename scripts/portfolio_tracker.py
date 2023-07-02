@@ -17,6 +17,7 @@ parser.add_argument('--start', default='', type=str, help='start date [YYYY-MM-D
 parser.add_argument('--end', default='', type=str, help='end date [YYYY-MM-DD]')
 parser.add_argument('--report', action='store_true', help='generate PDF report')
 parser.add_argument('--path', default='./', type=str, help='directory path')
+parser.add_argument('--config', default='config/config.ini', type=str, help='config file')
 args = parser.parse_args()
 
 timeframe = args.timeframe
@@ -40,7 +41,7 @@ else:
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
 
 config = configparser.ConfigParser()
-config.read(args.path + '/config/config.ini')
+config.read(args.path + '/' + args.config)
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -211,6 +212,7 @@ def plot_performance_charts(result_dict, save_to_file):
         ax1.set_xlabel('Date')
         ax1.set_ylabel('PnL')
         ax1.set_title('Overall PnL Change')
+        ax1.set_xlim(start_date, end_date)
 
         df = df.assign(pnl_change=df['pnl_pct_per_date'].diff().cumsum())
         line2, = ax2.plot(df['date'], df['pnl_change'], label=name)
@@ -220,6 +222,7 @@ def plot_performance_charts(result_dict, save_to_file):
         ax2.set_xlabel('Date')
         ax2.set_ylabel('PnL')
         ax2.set_title(timeframe + ' PnL Change')
+        ax2.set_xlim(start_date, end_date)
 
     for ax in (ax1, ax2):
         ax.tick_params(axis='x', labelrotation=20)
