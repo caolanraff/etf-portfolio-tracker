@@ -18,7 +18,7 @@ parser.add_argument('--start', default='', type=str, help='start date [YYYY-MM-D
 parser.add_argument('--end', default='', type=str, help='end date [YYYY-MM-DD]')
 parser.add_argument('--report', action='store_true', help='generate PDF report')
 parser.add_argument('--path', default='./', type=str, help='directory path')
-parser.add_argument('--config', default='config/config.ini', type=str, help='config file')
+parser.add_argument('--config', default='config/default.ini', type=str, help='config file')
 args = parser.parse_args()
 
 timeframe = args.timeframe
@@ -124,7 +124,7 @@ def calculate_all_portfolio_pnl():
 
 
 ### Save dataframe to PDF
-def save_dataframe_to_pdf(df, file, highlight_columns=None, thresholds=None, operators=None):
+def save_dataframe_to_pdf(df, file, highlight_columns=None, thresholds=None, operators=None, highlight_colour=None):
     fig, ax = plt.subplots(figsize=(12,4))
     ax.axis('tight')
     ax.axis('off')
@@ -134,7 +134,7 @@ def save_dataframe_to_pdf(df, file, highlight_columns=None, thresholds=None, ope
             cell.set_text_props(fontweight='bold', ha='left')
         else:
             cell.set_text_props(ha='left')
-            if highlight_columns and thresholds and operators:
+            if highlight_columns and thresholds and operators and highlight_colour:
                 for i, col_name in enumerate(highlight_columns):
                     try:
                         col_index = df.columns.get_loc(col_name)
@@ -143,9 +143,9 @@ def save_dataframe_to_pdf(df, file, highlight_columns=None, thresholds=None, ope
                     if col == col_index:
                         cell_value = float(cell.get_text().get_text())
                         if operators[i] == ">" and cell_value > thresholds[i]:
-                            cell.set_facecolor('red')
+                            cell.set_facecolor(highlight_colour)
                         elif operators[i] == "<" and cell_value < thresholds[i]:
-                            cell.set_facecolor('red')
+                            cell.set_facecolor(highlight_colour)
     pp = PdfPages(file)
     pp.savefig(fig, bbox_inches='tight')
     pp.close()
@@ -238,7 +238,7 @@ def plot_performance_charts(result_dict, save_to_file):
         ax2.set_xlim(start_date, end_date)
 
     for ax in (ax1, ax2):
-        ax.tick_params(axis='x', labelrotation=20)
+        ax.tick_params(axis='x', labelrotation=12)
     fig.legend(handles, labels)
 
     if save_to_file:
@@ -337,11 +337,15 @@ def get_metrics(result_dict):
     result_df['YTD Daily Total Return'] = result_df['YTD Daily Total Return'].str.rstrip('%')
     result_df = result_df[['Investor', 'Ticker'] + metrics]
 
-    save_dataframe_to_pdf(result_df, "metrics.pdf",
-                          metrics,
-                          [1.2, 0.5, 30, 0.7, -5],
-                          [">", ">", ">", "<", "<"]
-                          )
+    threshold = config.get('Metrics', 'threshold').split(',')
+    threshold = [float(s) for s in threshold]
+    operator = config.get('Metrics', 'operator').split(',')
+    highlight = config.get('Metrics', 'highlight')
+
+    if len(threshold) > 1:
+        save_dataframe_to_pdf(result_df, "metrics.pdf", metrics, threshold, operator, highlight)
+    else:
+        save_dataframe_to_pdf(result_df, "metrics.pdf")
 
 
 ### Merge pdf files
