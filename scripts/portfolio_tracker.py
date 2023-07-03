@@ -37,9 +37,10 @@ else:
     start_date = datetime.strptime(start_date, '%Y-%m-%d')
 
 if end_date == '':
-    end_date = datetime(now.year, now.month, now.day-1)
+    end_date = datetime(now.year, now.month, now.day)
 else:
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
+    end_date = end_date + timedelta(days=1)
 
 config = configparser.ConfigParser()
 config.read(args.path + '/' + args.config)
@@ -57,7 +58,7 @@ def calculate_portfolio_pnl(file_path, sheet):
         return
 
     df['date'] = pd.to_datetime(df['date'])
-    max_date = pd.Timestamp.now() - pd.Timedelta(days=1)
+    max_date = pd.Timestamp(end_date)
     grouped = df.groupby('ticker')
     result_df = pd.DataFrame()
 
