@@ -50,7 +50,7 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.width', None)
 
 
-### calculate pnl
+### Calculate pnl
 def calculate_portfolio_pnl(file_path, sheet):
     df = pd.read_excel(file_path, sheet_name=sheet)
     if len(df) == 0:
@@ -109,7 +109,7 @@ def calculate_portfolio_pnl(file_path, sheet):
     return result_df
 
 
-### Calculate PnL
+### Calculate PnL for all portfolios
 def calculate_all_portfolio_pnl():
     print('[INFO] Calculating portfolio PnLs')
     result_dict = {}
@@ -211,7 +211,7 @@ def get_summary(result_dict, save_to_file):
         print(summary)
 
 
-### Chart
+### Chart portfolio performances
 def plot_performance_charts(result_dict, save_to_file):
     print('[INFO] Plotting performance charts')
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -248,7 +248,7 @@ def plot_performance_charts(result_dict, save_to_file):
         plt.show()
 
 
-# new trades
+### Get new trades
 def new_trades(result_dict):
     print('[INFO] Getting new trades')
     result_df = pd.DataFrame()
@@ -262,7 +262,7 @@ def new_trades(result_dict):
     save_dataframe_to_pdf(result_df, "new_trades.pdf")
 
 
-### best and worst
+### Get best and worst ETFs performance
 # @TODO: best and worst with timeframe
 def best_and_worst(result_dict):
     print('[INFO] Getting best and worst ETFs')
@@ -289,7 +289,7 @@ def best_and_worst(result_dict):
     save_dataframe_to_pdf(result_df, "best_and_worst.pdf")
 
 
-### pie chart
+### Plot ETF weightings pie chart
 def plot_pie_charts(result_dict):
     print('[INFO] Plotting ETF weightings')
     n = len(result_dict)
@@ -317,7 +317,32 @@ def plot_pie_charts(result_dict):
     plt.savefig('weightings.pdf')
 
 
-# Get metrics
+### Plot combined ETF weightings pie chart
+def plot_combined_pie_chart(result_dict):
+    print('[INFO] Plotting combined ETF weightings')
+    result_df = pd.DataFrame()
+
+    for key, df in result_dict.items():
+        df = df.loc[df['date'] == end_date].copy()
+        result_df = result_df.append(df, ignore_index=True)
+
+    df = result_df.groupby('ticker')['notional_value'].sum()
+    total_sum = df.sum()
+    other = float(config.get('Weightings', 'other'))
+    threshold = other * total_sum
+    small_values = df[df < threshold]
+    if len(small_values) > 0:
+        df = df[df >= threshold]
+        df['Other'] = small_values.sum()
+
+    plt.clf()
+    df.plot(kind='pie', autopct='%1.1f%%')
+    plt.title('Combined ETF Weightings', fontweight='bold')
+    plt.ylabel('')
+    plt.savefig('combined.pdf')
+
+
+### Get metrics
 def get_metrics(result_dict):
     print('[INFO] Getting metrics')
     result_df = pd.DataFrame()
@@ -361,7 +386,7 @@ def merge_pdfs(file_list, output_file):
     pdf_output.write(output_file)
 
 
-### main
+### Main
 def comp():
     print(f"[INFO] Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
     res_dict = calculate_all_portfolio_pnl()
@@ -381,8 +406,9 @@ def report():
     new_trades(res_dict)
     best_and_worst(res_dict)
     plot_pie_charts(res_dict)
+    plot_combined_pie_chart(res_dict)
     get_metrics(res_dict)
-    merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf', 'metrics.pdf'],
+    merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf', 'combined.pdf', 'metrics.pdf'],
                args.path + '/data/output/' + config.get('Output', 'file'))
 
 
