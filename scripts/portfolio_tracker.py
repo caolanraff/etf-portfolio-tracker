@@ -263,21 +263,23 @@ def new_trades(result_dict):
 
 
 ### Get best and worst ETFs performance
-# @TODO: best and worst with timeframe
 def best_and_worst(result_dict):
     print('[INFO] Getting best and worst ETFs')
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
-        df = df.loc[df['date'] == end_date].copy()
-        total_notional = df['notional_value'].sum()
-        df['pnl_val'] = df['pnl'] / total_notional * 100
-        df['pnl_pct'] = df['pnl'] / df['notional_value'] * 100
+        start = df.loc[df['date'] == start_date]
+        end = df.loc[df['date'] == end_date]
+        merged_df = pd.merge(start, end, on='ticker', suffixes=('_start', '_end'))
+        total_notional = end['notional_value'].sum()
 
-        best_portfolio_contribution = df.loc[df['pnl_val'].idxmax(), 'ticker']
-        worst_portfolio_contribution = df.loc[df['pnl_val'].idxmin(), 'ticker']
-        best_pnl_pct = df.loc[df['pnl_pct'].idxmax(), 'ticker']
-        worst_pnl_pct = df.loc[df['pnl_pct'].idxmin(), 'ticker']
+        merged_df['pnl_val'] = (merged_df['pnl_end'] - merged_df['pnl_start']) / total_notional * 100
+        merged_df['pnl_pct'] = (merged_df['pnl_end'] - merged_df['pnl_start']) / merged_df['pnl_start'] * 100
+
+        best_portfolio_contribution = merged_df.loc[merged_df['pnl_val'].idxmax(), 'ticker']
+        worst_portfolio_contribution = merged_df.loc[merged_df['pnl_val'].idxmin(), 'ticker']
+        best_pnl_pct = merged_df.loc[merged_df['pnl_pct'].idxmax(), 'ticker']
+        worst_pnl_pct = merged_df.loc[merged_df['pnl_pct'].idxmin(), 'ticker']
 
         result_df = result_df.append({'Investor': key,
                                       'Best Portfolio Contributer': best_portfolio_contribution,
