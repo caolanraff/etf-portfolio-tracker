@@ -11,6 +11,10 @@ import os
 from fpdf import FPDF
 import math
 import configparser
+import requests
+import json
+from bs4 import BeautifulSoup
+import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--timeframe', type=str, help='timeframe [MTD|YTD|adhoc]')
@@ -97,7 +101,9 @@ def calculate_portfolio_pnl(file_path, sheet):
     # Calculate PnL
     result_df['pnl'] = result_df['cumulative_quantity'] * (result_df['market_price'] - result_df['average_entry_price'])
     # Sort the dataframe by date
-    result_df = result_df.sort_values('date')
+    result_df = result_df.reset_index()
+    result_df = result_df.sort_values(['date', 'index'])
+    result_df = result_df.drop('index', axis=1)
     # Calculate the PNL per date
     result_df['portfolio_pnl'] = result_df.groupby('date')['pnl'].transform('sum')
     # Calculate the portfolio value per date
@@ -256,7 +262,7 @@ def new_trades(result_dict):
     for key, df in result_dict.items():
         trades = df.loc[df['quantity'] != 0]
         tickers = trades['ticker'].to_list()
-        tickers = ', '.join(tickers)
+        tickers = ', '.join(set(tickers))
         result_df = result_df.append({'Investor': key, 'Trades': tickers}, ignore_index=True)
 
     save_dataframe_to_pdf(result_df, "new_trades.pdf")
@@ -274,7 +280,7 @@ def best_and_worst(result_dict):
         total_notional = end['notional_value'].sum()
 
         merged_df['pnl_val'] = (merged_df['pnl_end'] - merged_df['pnl_start']) / total_notional * 100
-        merged_df['pnl_pct'] = (merged_df['pnl_end'] - merged_df['pnl_start']) / merged_df['pnl_start'] * 100
+        merged_df['pnl_pct'] = (merged_df['pnl_end'] - merged_df['pnl_start']) / abs(merged_df['pnl_start']) * 100
 
         best_portfolio_contribution = merged_df.loc[merged_df['pnl_val'].idxmax(), 'ticker']
         worst_portfolio_contribution = merged_df.loc[merged_df['pnl_val'].idxmin(), 'ticker']
@@ -376,6 +382,61 @@ def get_metrics(result_dict):
         save_dataframe_to_pdf(result_df, "metrics.pdf")
 
 
+### ETF holdings
+def extract_holdings(tickers):
+    df_list = []
+    for ticker in tickers:
+        url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"}
+        with requests.Session() as req:
+            req.headers.update(headers)
+            r = req.get(url)
+            html = r.text
+            start = html.find('etf_holdings.formatted_data = ') + len('etf_holdings.formatted_data = ')
+            end = html.find(';', start)
+            formatted_data = html[start:end].strip()
+            try:
+                data = json.loads(formatted_data)
+            except:
+                print('[ERROR] Unable to get underlyings for ' + ticker)
+                continue
+
+            symbols = [item[1] if len(item[1]) <= 10 else BeautifulSoup(item[1], 'html.parser').find('a').get('rel')[0] if BeautifulSoup(item[1], 'html.parser').find('a') else '' for item in data]
+            names = [re.search('title="([^"]+)"', item[0]).group(1).split('-', 1)[0] if 'title=' in item[0] else item[0] for item in data]
+            weights = [float(lst[3]) if lst[3] != 'NA' else None for lst in data]
+
+            df = pd.DataFrame({'Stock': symbols, 'Company': names, 'Weight': weights})
+            df.insert(0, 'ticker', ticker)
+            df_list.append(df)
+
+    result_df = pd.concat(df_list, ignore_index=True)
+    return result_df
+
+
+def get_top_holdings(result_dict):
+    print('[INFO] Getting top holdings')
+    result_df = pd.DataFrame()
+
+    for key, df in result_dict.items():
+        df = df.loc[df['date'] == end_date]
+        df = df[['ticker', 'notional_value']]
+        holdings = extract_holdings(df['ticker'])
+        res = pd.merge(df, holdings, on=['ticker'], how='outer')
+        res['symbol_notional'] = res['notional_value'] * (res['Weight'] / 100)
+        grouped = res.groupby(['Stock', 'Company'])['symbol_notional'].sum()
+        grouped = grouped.reset_index()
+        total_notional = df['notional_value'].sum()
+        grouped['Weight'] = grouped['symbol_notional'] / total_notional * 100
+        top = int(config.get('Holdings', 'top'))
+        holdings = grouped.sort_values('Weight', ascending=False).head(top)
+        holdings['Investor'] = key
+        holdings['Weight'] = [round(x, 2) for x in holdings['Weight']]
+        holdings = holdings[['Investor', 'Stock', 'Company', 'Weight']]
+        result_df = result_df.append(holdings, ignore_index=True)
+
+    save_dataframe_to_pdf(result_df, "holdings.pdf")
+
+
 ### Merge pdf files
 def merge_pdfs(file_list, output_file):
     print('[INFO] Merging files')
@@ -406,11 +467,16 @@ def report():
     get_summary(res_dict, True)
     plot_performance_charts(res_dict, True)
     new_trades(res_dict)
+    exclude = config.get('Input', 'exclude').split(',')
+    for key in exclude:
+        if key in res_dict:
+            del res_dict[key]
     best_and_worst(res_dict)
     plot_pie_charts(res_dict)
     plot_combined_pie_chart(res_dict)
     get_metrics(res_dict)
-    merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf', 'combined.pdf', 'metrics.pdf'],
+    get_top_holdings(res_dict)
+    merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf', 'combined.pdf', 'metrics.pdf', 'holdings.pdf'],
                args.path + '/data/output/' + config.get('Output', 'file'))
 
 
