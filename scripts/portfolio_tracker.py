@@ -131,7 +131,7 @@ def calculate_all_portfolio_pnl():
 
 
 ### Save dataframe to PDF
-def save_dataframe_to_pdf(df, file, highlight_columns=None, thresholds=None, operators=None, highlight_colour=None):
+def save_dataframe_to_pdf(title, df, file, highlight_columns=None, thresholds=None, operators=None, highlight_colour=None):
     fig, ax = plt.subplots(figsize=(12,4))
     ax.axis('tight')
     ax.axis('off')
@@ -153,6 +153,8 @@ def save_dataframe_to_pdf(df, file, highlight_columns=None, thresholds=None, ope
                             cell.set_facecolor(highlight_colour)
                         elif operators[i] == "<" and cell_value < thresholds[i]:
                             cell.set_facecolor(highlight_colour)
+    if title:
+        ax.set_title(title)
     pp = PdfPages(file)
     pp.savefig(fig, bbox_inches='tight')
     pp.close()
@@ -212,7 +214,7 @@ def get_summary(result_dict, save_to_file):
     summary['Notes'] = summary['Notes'].fillna('')
 
     if save_to_file:
-        save_dataframe_to_pdf(summary, "summary.pdf")
+        save_dataframe_to_pdf('Summary', summary, 'summary.pdf')
     else:
         print(summary)
 
@@ -265,7 +267,7 @@ def new_trades(result_dict):
         tickers = ', '.join(set(tickers))
         result_df = result_df.append({'Investor': key, 'Trades': tickers}, ignore_index=True)
 
-    save_dataframe_to_pdf(result_df, "new_trades.pdf")
+    save_dataframe_to_pdf('New Trades', result_df, 'new_trades.pdf')
 
 
 ### Get best and worst ETFs performance
@@ -294,7 +296,7 @@ def best_and_worst(result_dict):
                                       'Worst PnL %': worst_pnl_pct
                                       }, ignore_index=True)
 
-    save_dataframe_to_pdf(result_df, "best_and_worst.pdf")
+    save_dataframe_to_pdf('Best & Worst Performers', result_df, 'best_and_worst.pdf')
 
 
 ### Plot ETF weightings pie chart
@@ -377,9 +379,9 @@ def get_metrics(result_dict):
     highlight = config.get('Metrics', 'highlight')
 
     if len(threshold) > 1:
-        save_dataframe_to_pdf(result_df, "metrics.pdf", metrics, threshold, operator, highlight)
+        save_dataframe_to_pdf(None, result_df, 'metrics.pdf', metrics, threshold, operator, highlight)
     else:
-        save_dataframe_to_pdf(result_df, "metrics.pdf")
+        save_dataframe_to_pdf(None, result_df, 'metrics.pdf')
 
 
 ### ETF holdings
@@ -427,14 +429,14 @@ def get_top_holdings(result_dict):
         grouped = grouped.reset_index()
         total_notional = df['notional_value'].sum()
         grouped['Weight'] = grouped['symbol_notional'] / total_notional * 100
-        top = int(config.get('Holdings', 'top'))
-        holdings = grouped.sort_values('Weight', ascending=False).head(top)
+        top = config.get('Holdings', 'top')
+        holdings = grouped.sort_values('Weight', ascending=False).head(int(top))
         holdings['Investor'] = key
         holdings['Weight'] = [round(x, 2) for x in holdings['Weight']]
         holdings = holdings[['Investor', 'Stock', 'Company', 'Weight']]
         result_df = result_df.append(holdings, ignore_index=True)
 
-    save_dataframe_to_pdf(result_df, "holdings.pdf")
+    save_dataframe_to_pdf(None, result_df, "holdings.pdf")
 
 
 ### Merge pdf files
@@ -476,7 +478,8 @@ def report():
     plot_combined_pie_chart(res_dict)
     get_metrics(res_dict)
     get_top_holdings(res_dict)
-    merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf', 'combined.pdf', 'metrics.pdf', 'holdings.pdf'],
+    merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf',
+                'combined.pdf', 'metrics.pdf', 'holdings.pdf'],
                args.path + '/data/output/' + config.get('Output', 'file'))
 
 
