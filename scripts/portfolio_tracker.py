@@ -40,11 +40,12 @@ if start_date == '':
 else:
     start_date = datetime.strptime(start_date, '%Y-%m-%d')
 
+start_date = start_date + timedelta(days=-1)
+
 if end_date == '':
     end_date = datetime(now.year, now.month, now.day)
 else:
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
-    end_date = end_date + timedelta(days=1)
 
 config = configparser.ConfigParser()
 config.read(args.path + '/' + args.config)
@@ -62,6 +63,8 @@ def calculate_portfolio_pnl(file_path, sheet):
         return
 
     df['date'] = pd.to_datetime(df['date'])
+    # Aggregate the trades by date, ticker
+    df = df.groupby(['date', 'ticker']).agg({'quantity': 'sum', 'price': lambda x: np.average(x, weights=df.loc[x.index, 'quantity'])}).reset_index()
     max_date = pd.Timestamp(end_date)
     grouped = df.groupby('ticker')
     result_df = pd.DataFrame()
@@ -89,7 +92,7 @@ def calculate_portfolio_pnl(file_path, sheet):
     min_date = min_date - timedelta(days=7)
     prices = {}
     for ticker in result_df['ticker'].unique():
-        ticker_data = yf.Ticker(ticker).history(start=min_date, end=max_date)
+        ticker_data = yf.Ticker(ticker).history(start=min_date, end=max_date, auto_adjust=True)
         ticker_data = ticker_data.reindex(pd.date_range(min_date, max_date, freq='D'))
         ticker_data['Close'] = ticker_data['Close'].interpolate()
         prices[ticker] = ticker_data['Close']
@@ -109,8 +112,9 @@ def calculate_portfolio_pnl(file_path, sheet):
     # Calculate the portfolio value per date
     result_df['portfolio_cost'] = result_df.groupby('date')['cumulative_cost'].transform('sum')
     result_df['portfolio_value'] = result_df.groupby('date')['notional_value'].transform('sum')
-    # Calculate the PNL per date as a percentage
-    result_df['pnl_pct_per_date'] = 100 * (result_df['portfolio_value'] - result_df['portfolio_cost']) / result_df['portfolio_cost']
+    # Calculate the PNL percentage
+    result_df['pnl_pct'] = 100 * (result_df['portfolio_value'] - result_df['portfolio_cost']) / result_df['portfolio_cost']
+
     result_df = result_df.reset_index(drop=True)
     return result_df
 
@@ -198,12 +202,12 @@ def get_summary(result_dict, save_to_file):
     print('[INFO] Get summary info')
     val = []
 
-    for name, df in result_dict.items():
+    for key, df in result_dict.items():
         som = df.loc[df['date'] == start_date].iloc[0]
-        som = 100 * (som['portfolio_value'] - som['portfolio_cost']) / som['portfolio_cost']
         eom = df.loc[df['date'] == end_date].iloc[0]
-        eom = 100 * (eom['portfolio_value'] - eom['portfolio_cost']) / eom['portfolio_cost']
-        val.append(eom - som)
+        trades = df.loc[df['quantity'] != 0]
+        pnl = ((eom['portfolio_pnl'] - som['portfolio_pnl']) / (som['portfolio_value'] + trades['total_cost'].sum())) * 100
+        val.append(pnl)
 
     summary = pd.DataFrame({'Investor': list(result_dict.keys()), timeframe:val})
     summary = summary.sort_values(by=timeframe, ascending=False)
@@ -227,7 +231,11 @@ def plot_performance_charts(result_dict, save_to_file):
     labels = []   # labels for the legend
 
     for name, df in result_dict.items():
-        line1, = ax1.plot(df['date'], df['pnl_pct_per_date'], label=name)
+        group = df.groupby('date').agg({'pnl_pct': 'first', 'portfolio_value': 'first', 'portfolio_pnl': 'first', 'total_cost': 'sum'})
+        group['pnl_pct_per_date'] = (group['portfolio_pnl'] - group['portfolio_pnl'].iloc[0]) / (group['portfolio_value'].iloc[0] + group['total_cost']) * 100
+        group = group.reset_index()
+
+        line1, = ax1.plot(group['date'], group['pnl_pct'], label=name)
         if name not in labels:
             handles.append(line1)
             labels.append(name)
@@ -236,8 +244,7 @@ def plot_performance_charts(result_dict, save_to_file):
         ax1.set_title('Overall PnL Change')
         ax1.set_xlim(start_date, end_date)
 
-        df = df.assign(pnl_change=df['pnl_pct_per_date'].diff().cumsum())
-        line2, = ax2.plot(df['date'], df['pnl_change'], label=name)
+        line2, = ax2.plot(group['date'], group['pnl_pct_per_date'], label=name)
         if name not in labels:
             handles.append(line2)
             labels.append(name)
@@ -247,7 +254,7 @@ def plot_performance_charts(result_dict, save_to_file):
         ax2.set_xlim(start_date, end_date)
 
     for ax in (ax1, ax2):
-        ax.tick_params(axis='x', labelrotation=12)
+        ax.tick_params(axis='x', labelrotation=14)
     fig.legend(handles, labels)
 
     if save_to_file:
@@ -385,7 +392,7 @@ def get_metrics(result_dict):
 
 
 ### ETF holdings
-def extract_holdings(tickers):
+def extract_underlyings(tickers):
     df_list = []
     for ticker in tickers:
         url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
@@ -422,8 +429,9 @@ def get_top_holdings(result_dict):
     for key, df in result_dict.items():
         df = df.loc[df['date'] == end_date]
         df = df[['ticker', 'notional_value']]
-        holdings = extract_holdings(df['ticker'])
-        res = pd.merge(df, holdings, on=['ticker'], how='outer')
+        underlyings = extract_underlyings(df['ticker'])
+        underlyings = underlyings.drop_duplicates(subset=['ticker', 'Stock', 'Company'])
+        res = pd.merge(df, underlyings, on=['ticker'], how='left')
         res['symbol_notional'] = res['notional_value'] * (res['Weight'] / 100)
         grouped = res.groupby(['Stock', 'Company'])['symbol_notional'].sum()
         grouped = grouped.reset_index()
@@ -432,11 +440,32 @@ def get_top_holdings(result_dict):
         top = config.get('Holdings', 'top')
         holdings = grouped.sort_values('Weight', ascending=False).head(int(top))
         holdings['Investor'] = key
+        stocks = underlyings['Stock']
+        holdings['No. of Stocks'] = len(stocks.unique())
+        holdings['% of Overlap'] = round(100 * (len(stocks) - len(stocks.unique())) / len(stocks), 2)
         holdings['Weight'] = [round(x, 2) for x in holdings['Weight']]
-        holdings = holdings[['Investor', 'Stock', 'Company', 'Weight']]
+        holdings = holdings[['Investor', 'No. of Stocks', '% of Overlap', 'Stock', 'Company', 'Weight']]
         result_df = result_df.append(holdings, ignore_index=True)
 
     save_dataframe_to_pdf(None, result_df, "holdings.pdf")
+
+
+### ETF overlap matrix
+def get_overlaps(result_dict, name):
+    tickers = result_dict[name]['ticker'].unique()
+    underlyings = extract_underlyings(tickers)
+    group = underlyings.groupby('ticker')['Stock'].apply(list)
+    overlaps = pd.DataFrame(columns=['ETF1', 'ETF2', 'Overlap'])
+
+    for key in group.keys():
+        for i in group.keys():
+            val = 100 * len(set(group[key]).intersection(set(group[i]))) / len(set(group[key]))
+            overlaps = overlaps.append({'ETF1': key, 'ETF2': i, 'Overlap': val}, ignore_index=True)
+
+    matrix = overlaps.pivot(index='ETF1', columns='ETF2', values='Overlap')
+    matrix.index.name = None
+    matrix.columns.name = None
+    return matrix
 
 
 ### Merge pdf files
