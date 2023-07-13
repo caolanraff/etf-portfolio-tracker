@@ -15,6 +15,8 @@ import requests
 import json
 from bs4 import BeautifulSoup
 import re
+import seaborn as sns
+import logging
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--timeframe', type=str, help='timeframe [MTD|YTD|adhoc]')
@@ -24,6 +26,8 @@ parser.add_argument('--report', action='store_true', help='generate PDF report')
 parser.add_argument('--path', default='./', type=str, help='directory path')
 parser.add_argument('--config', default='config/default.ini', type=str, help='config file')
 args = parser.parse_args()
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 timeframe = args.timeframe
 start_date = args.start
@@ -35,7 +39,7 @@ if start_date == '':
     elif timeframe == 'YTD':
         start_date = datetime(now.year, 1, 1)
     else:
-        print('[ERROR] Unknown timeframe')
+        logging.error('Unknown timeframe')
         exit()
 else:
     start_date = datetime.strptime(start_date, '%Y-%m-%d')
@@ -59,7 +63,7 @@ pd.set_option('display.width', None)
 def calculate_portfolio_pnl(file_path, sheet):
     df = pd.read_excel(file_path, sheet_name=sheet)
     if len(df) == 0:
-        print("[WARN] Tab is empty for " + sheet)
+        logging.warning("Tab is empty for " + sheet)
         return
 
     df['date'] = pd.to_datetime(df['date'])
@@ -121,7 +125,7 @@ def calculate_portfolio_pnl(file_path, sheet):
 
 ### Calculate PnL for all portfolios
 def calculate_all_portfolio_pnl():
-    print('[INFO] Calculating portfolio PnLs')
+    logging.info('Calculating portfolio PnLs')
     result_dict = {}
     file = args.path + '/data/input/' + config.get('Input', 'file')
     sheets = pd.ExcelFile(file).sheet_names
@@ -186,7 +190,7 @@ def create_title_page(aum):
 
 ### Get AUM
 def get_aum(result_dict):
-    print('[INFO] Get AUM')
+    logging.info('Get AUM')
     portfolio_val = 0
 
     for name, df in result_dict.items():
@@ -199,7 +203,7 @@ def get_aum(result_dict):
 
 ### Get summary info
 def get_summary(result_dict, save_to_file):
-    print('[INFO] Get summary info')
+    logging.info('Get summary info')
     val = []
 
     for key, df in result_dict.items():
@@ -225,14 +229,14 @@ def get_summary(result_dict, save_to_file):
 
 ### Chart portfolio performances
 def plot_performance_charts(result_dict, save_to_file):
-    print('[INFO] Plotting performance charts')
+    logging.info('Plotting performance charts')
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
     handles = []  # handles for the legend
     labels = []   # labels for the legend
 
     for name, df in result_dict.items():
         group = df.groupby('date').agg({'pnl_pct': 'first', 'portfolio_value': 'first', 'portfolio_pnl': 'first', 'total_cost': 'sum'})
-        group['pnl_pct_per_date'] = (group['portfolio_pnl'] - group['portfolio_pnl'].iloc[0]) / (group['portfolio_value'].iloc[0] + group['total_cost']) * 100
+        group['pnl_pct_per_date'] = (group['portfolio_pnl'] - group['portfolio_pnl'].iloc[0]) / (group['portfolio_value'].iloc[0] + group['total_cost'].cumsum()) * 100
         group = group.reset_index()
 
         line1, = ax1.plot(group['date'], group['pnl_pct'], label=name)
@@ -265,7 +269,7 @@ def plot_performance_charts(result_dict, save_to_file):
 
 ### Get new trades
 def new_trades(result_dict):
-    print('[INFO] Getting new trades')
+    logging.info('Getting new trades')
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
@@ -279,7 +283,7 @@ def new_trades(result_dict):
 
 ### Get best and worst ETFs performance
 def best_and_worst(result_dict):
-    print('[INFO] Getting best and worst ETFs')
+    logging.info('Getting best and worst ETFs')
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
@@ -308,7 +312,7 @@ def best_and_worst(result_dict):
 
 ### Plot ETF weightings pie chart
 def plot_pie_charts(result_dict):
-    print('[INFO] Plotting ETF weightings')
+    logging.info('Plotting ETF weightings')
     n = len(result_dict)
     num_cols = 3
     num_rows = math.ceil(n / num_cols)
@@ -336,7 +340,7 @@ def plot_pie_charts(result_dict):
 
 ### Plot combined ETF weightings pie chart
 def plot_combined_pie_chart(result_dict):
-    print('[INFO] Plotting combined ETF weightings')
+    logging.info('Plotting combined ETF weightings')
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
@@ -361,7 +365,7 @@ def plot_combined_pie_chart(result_dict):
 
 ### Get metrics
 def get_metrics(result_dict):
-    print('[INFO] Getting metrics')
+    logging.info('Getting metrics')
     result_df = pd.DataFrame()
     metrics = ['Beta (5Y Monthly)', 'Expense Ratio (net)', 'PE Ratio (TTM)', 'Yield', 'YTD Daily Total Return']
 
@@ -407,7 +411,7 @@ def extract_underlyings(tickers):
             try:
                 data = json.loads(formatted_data)
             except:
-                print('[ERROR] Unable to get underlyings for ' + ticker)
+                logging.error('Unable to get underlyings for ' + ticker)
                 continue
 
             symbols = [item[1] if len(item[1]) <= 10 else BeautifulSoup(item[1], 'html.parser').find('a').get('rel')[0] if BeautifulSoup(item[1], 'html.parser').find('a') else '' for item in data]
@@ -423,7 +427,7 @@ def extract_underlyings(tickers):
 
 
 def get_top_holdings(result_dict):
-    print('[INFO] Getting top holdings')
+    logging.info('Getting top holdings')
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
@@ -450,8 +454,10 @@ def get_top_holdings(result_dict):
     save_dataframe_to_pdf(None, result_df, "holdings.pdf")
 
 
-### ETF overlap matrix
-def get_overlaps(result_dict, name):
+### ETF overlap heatmap
+def get_overlaps(result_dict, save_to_file):
+    logging.info('Plotting ETF overlap heatmap')
+    name = config.get('Overlaps', 'name')
     tickers = result_dict[name]['ticker'].unique()
     underlyings = extract_underlyings(tickers)
     group = underlyings.groupby('ticker')['Stock'].apply(list)
@@ -465,12 +471,22 @@ def get_overlaps(result_dict, name):
     matrix = overlaps.pivot(index='ETF1', columns='ETF2', values='Overlap')
     matrix.index.name = None
     matrix.columns.name = None
-    return matrix
+
+    plt.clf()
+    sns_plot = sns.heatmap(matrix, cmap='Blues', annot=True, fmt='.2f')
+    if save_to_file:
+        sns_plot.figure.set_size_inches(10, 7)
+        sns_plot.set_title('ETF Overlaps', fontsize=16)
+        pp = PdfPages('heatmap.pdf')
+        pp.savefig(sns_plot.figure)
+        pp.close()
+    else:
+        plt.show()
 
 
 ### Merge pdf files
 def merge_pdfs(file_list, output_file):
-    print('[INFO] Merging files')
+    logging.info('Merging files')
     pdf_output = pdfrw.PdfWriter()
     for file_name in file_list:
         pdf_input = pdfrw.PdfReader(file_name)
@@ -482,16 +498,17 @@ def merge_pdfs(file_list, output_file):
 
 ### Main
 def comp():
-    print(f"[INFO] Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
+    logging.info(f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
-    print('[INFO] AUM: ' + aum)
+    logging.info('AUM: ' + aum)
     get_summary(res_dict, False)
     plot_performance_charts(res_dict, False)
+    get_overlaps(res_dict, False)
 
 
 def report():
-    print(f"[INFO] Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
+    logging.info(f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})")
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
     create_title_page(aum)
@@ -507,8 +524,9 @@ def report():
     plot_combined_pie_chart(res_dict)
     get_metrics(res_dict)
     get_top_holdings(res_dict)
+    get_overlaps(res_dict, True)
     merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf',
-                'combined.pdf', 'metrics.pdf', 'holdings.pdf'],
+                'combined.pdf', 'metrics.pdf', 'holdings.pdf', 'heatmap.pdf'],
                args.path + '/data/output/' + config.get('Output', 'file'))
 
 
