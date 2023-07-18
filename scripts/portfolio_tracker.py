@@ -465,7 +465,7 @@ def get_top_holdings(result_dict):
 
 
 ### ETF overlap heatmap
-def get_overlaps(result_dict, save_to_file):
+def get_overlaps(result_dict):
     logging.info('Plotting ETF overlap heatmap')
 
     for key, df in result_dict.items():
@@ -485,15 +485,12 @@ def get_overlaps(result_dict, save_to_file):
 
         plt.clf()
         sns_plot = sns.heatmap(matrix, cmap='Blues', annot=True, fmt='.2f')
-        if save_to_file:
-            sns_plot.figure.set_size_inches(10, 7)
-            sns_plot.set_title('ETF Overlaps - ' + key, fontsize=16)
-            files.append('heatmap_' + key + '.pdf')
-            pp = PdfPages(files[-1])
-            pp.savefig(sns_plot.figure)
-            pp.close()
-        else:
-            plt.show()
+        sns_plot.figure.set_size_inches(10, 7)
+        sns_plot.set_title('ETF Overlaps - ' + key, fontsize=16)
+        files.append('heatmap_' + key + '.pdf')
+        pp = PdfPages(files[-1])
+        pp.savefig(sns_plot.figure)
+        pp.close()
 
 
 ### Merge pdf files
@@ -516,7 +513,6 @@ def comp():
     logging.info('AUM: ' + aum)
     get_summary(res_dict, False)
     plot_performance_charts(res_dict, False)
-    get_overlaps(res_dict, False)
 
 
 def report():
@@ -536,7 +532,7 @@ def report():
     plot_combined_pie_chart(res_dict)
     get_metrics(res_dict)
     get_top_holdings(res_dict)
-    get_overlaps(res_dict, True)
+    get_overlaps(res_dict)
     merge_pdfs(files, args.path + '/data/output/' + config.get('Output', 'file'))
 
 
