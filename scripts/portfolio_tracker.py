@@ -58,6 +58,7 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.set_option('display.width', None)
 
+files = []
 
 ### Calculate pnl
 def calculate_portfolio_pnl(file_path, sheet):
@@ -185,7 +186,8 @@ def create_title_page(aum):
     if image != '':
         image_file = args.path + '/data/input/' + image
         pdf_output.image(image_file, x=55, y=150, w=100, h=100)
-    pdf_output.output('title.pdf')
+    files.append('title.pdf')
+    pdf_output.output(files[-1])
 
 
 ### Get AUM
@@ -222,7 +224,8 @@ def get_summary(result_dict, save_to_file):
     summary['Notes'] = summary['Notes'].fillna('')
 
     if save_to_file:
-        save_dataframe_to_pdf('Summary', summary, 'summary.pdf')
+        files.append('summary.pdf')
+        save_dataframe_to_pdf('Summary', summary, files[-1])
     else:
         print(summary)
 
@@ -262,7 +265,8 @@ def plot_performance_charts(result_dict, save_to_file):
     fig.legend(handles, labels)
 
     if save_to_file:
-        plt.savefig('performance.pdf')
+        files.append('performance.pdf')
+        plt.savefig(files[-1])
     else:
         plt.show()
 
@@ -278,7 +282,8 @@ def new_trades(result_dict):
         tickers = ', '.join(set(tickers))
         result_df = result_df.append({'Investor': key, 'Trades': tickers}, ignore_index=True)
 
-    save_dataframe_to_pdf('New Trades', result_df, 'new_trades.pdf')
+    files.append('new_trades.pdf')
+    save_dataframe_to_pdf('New Trades', result_df, files[-1])
 
 
 ### Get best and worst ETFs performance
@@ -307,7 +312,8 @@ def best_and_worst(result_dict):
                                       'Worst PnL %': worst_pnl_pct
                                       }, ignore_index=True)
 
-    save_dataframe_to_pdf('Best & Worst Performers', result_df, 'best_and_worst.pdf')
+    files.append('best_and_worst.pdf')
+    save_dataframe_to_pdf('Best & Worst Performers', result_df, files[-1])
 
 
 ### Plot ETF weightings pie chart
@@ -335,7 +341,8 @@ def plot_pie_charts(result_dict):
         fig.delaxes(axs[row][col])
 
     plt.suptitle('ETF Weightings')
-    plt.savefig('weightings.pdf')
+    files.append('weightings.pdf')
+    plt.savefig(files[-1])
 
 
 ### Plot combined ETF weightings pie chart
@@ -360,7 +367,8 @@ def plot_combined_pie_chart(result_dict):
     df.plot(kind='pie', autopct='%1.1f%%')
     plt.title('Combined ETF Weightings', fontweight='bold')
     plt.ylabel('')
-    plt.savefig('combined.pdf')
+    files.append('combined.pdf')
+    plt.savefig(files[-1])
 
 
 ### Get metrics
@@ -389,10 +397,11 @@ def get_metrics(result_dict):
     operator = config.get('Metrics', 'operator').split(',')
     highlight = config.get('Metrics', 'highlight')
 
+    files.append('metrics.pdf')
     if len(threshold) > 1:
-        save_dataframe_to_pdf(None, result_df, 'metrics.pdf', metrics, threshold, operator, highlight)
+        save_dataframe_to_pdf(None, result_df, files[-1], metrics, threshold, operator, highlight)
     else:
-        save_dataframe_to_pdf(None, result_df, 'metrics.pdf')
+        save_dataframe_to_pdf(None, result_df, files[-1])
 
 
 ### ETF holdings
@@ -451,7 +460,8 @@ def get_top_holdings(result_dict):
         holdings = holdings[['Investor', 'No. of Stocks', '% of Overlap', 'Stock', 'Company', 'Weight']]
         result_df = result_df.append(holdings, ignore_index=True)
 
-    save_dataframe_to_pdf(None, result_df, "holdings.pdf")
+    files.append('holdings.pdf')
+    save_dataframe_to_pdf(None, result_df, files[-1])
 
 
 ### ETF overlap heatmap
@@ -476,8 +486,9 @@ def get_overlaps(result_dict, save_to_file):
     sns_plot = sns.heatmap(matrix, cmap='Blues', annot=True, fmt='.2f')
     if save_to_file:
         sns_plot.figure.set_size_inches(10, 7)
-        sns_plot.set_title('ETF Overlaps', fontsize=16)
-        pp = PdfPages('heatmap.pdf')
+        sns_plot.set_title('ETF Overlaps - ' + name, fontsize=16)
+        files.append('heatmap.pdf')
+        pp = PdfPages(files[-1])
         pp.savefig(sns_plot.figure)
         pp.close()
     else:
@@ -525,9 +536,7 @@ def report():
     get_metrics(res_dict)
     get_top_holdings(res_dict)
     get_overlaps(res_dict, True)
-    merge_pdfs(['title.pdf', 'summary.pdf', 'performance.pdf', 'new_trades.pdf', 'best_and_worst.pdf', 'weightings.pdf',
-                'combined.pdf', 'metrics.pdf', 'holdings.pdf', 'heatmap.pdf'],
-               args.path + '/data/output/' + config.get('Output', 'file'))
+    merge_pdfs(files, args.path + '/data/output/' + config.get('Output', 'file'))
 
 
 if __name__ == "__main__":
