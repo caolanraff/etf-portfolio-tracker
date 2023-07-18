@@ -467,32 +467,33 @@ def get_top_holdings(result_dict):
 ### ETF overlap heatmap
 def get_overlaps(result_dict, save_to_file):
     logging.info('Plotting ETF overlap heatmap')
-    name = config.get('Overlaps', 'name')
-    tickers = result_dict[name]['ticker'].unique()
-    underlyings = extract_underlyings(tickers)
-    group = underlyings.groupby('ticker')['Stock'].apply(list)
-    overlaps = pd.DataFrame(columns=['ETF1', 'ETF2', 'Overlap'])
 
-    for key in group.keys():
-        for i in group.keys():
-            val = 100 * len(set(group[key]).intersection(set(group[i]))) / len(set(group[key]))
-            overlaps = overlaps.append({'ETF1': key, 'ETF2': i, 'Overlap': val}, ignore_index=True)
+    for key, df in result_dict.items():
+        tickers = df['ticker'].unique()
+        underlyings = extract_underlyings(tickers)
+        group = underlyings.groupby('ticker')['Stock'].apply(list)
+        overlaps = pd.DataFrame(columns=['ETF1', 'ETF2', 'Overlap'])
 
-    matrix = overlaps.pivot(index='ETF1', columns='ETF2', values='Overlap')
-    matrix.index.name = None
-    matrix.columns.name = None
+        for k in group.keys():
+            for i in group.keys():
+                val = 100 * len(set(group[k]).intersection(set(group[i]))) / len(set(group[k]))
+                overlaps = overlaps.append({'ETF1': k, 'ETF2': i, 'Overlap': val}, ignore_index=True)
 
-    plt.clf()
-    sns_plot = sns.heatmap(matrix, cmap='Blues', annot=True, fmt='.2f')
-    if save_to_file:
-        sns_plot.figure.set_size_inches(10, 7)
-        sns_plot.set_title('ETF Overlaps - ' + name, fontsize=16)
-        files.append('heatmap.pdf')
-        pp = PdfPages(files[-1])
-        pp.savefig(sns_plot.figure)
-        pp.close()
-    else:
-        plt.show()
+        matrix = overlaps.pivot(index='ETF1', columns='ETF2', values='Overlap')
+        matrix.index.name = None
+        matrix.columns.name = None
+
+        plt.clf()
+        sns_plot = sns.heatmap(matrix, cmap='Blues', annot=True, fmt='.2f')
+        if save_to_file:
+            sns_plot.figure.set_size_inches(10, 7)
+            sns_plot.set_title('ETF Overlaps - ' + key, fontsize=16)
+            files.append('heatmap_' + key + '.pdf')
+            pp = PdfPages(files[-1])
+            pp.savefig(sns_plot.figure)
+            pp.close()
+        else:
+            plt.show()
 
 
 ### Merge pdf files
