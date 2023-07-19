@@ -471,6 +471,7 @@ def get_overlaps(result_dict):
     for key, df in result_dict.items():
         tickers = df['ticker'].unique()
         underlyings = extract_underlyings(tickers)
+        underlyings['Stock'] = underlyings['Stock'].replace('N/A', np.nan).fillna(underlyings['Company'])
         group = underlyings.groupby('ticker')['Stock'].apply(list)
         overlaps = pd.DataFrame(columns=['ETF1', 'ETF2', 'Overlap'])
 

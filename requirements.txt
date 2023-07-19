@@ -4,7 +4,8 @@ datetime
 matplotlib
 argparse
 yahoo_fin
-matplotlib.backends.backend_pdf
 pdfrw
-os
 fpdf
+seaborn
+openpyxl
+bs4
