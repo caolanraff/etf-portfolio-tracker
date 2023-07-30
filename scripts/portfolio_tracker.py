@@ -59,6 +59,7 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.width', None)
 
 files = []
+output_dir = args.path + '/data/output/'
 
 ### Calculate pnl
 def calculate_portfolio_pnl(file_path, sheet):
@@ -88,8 +89,9 @@ def calculate_portfolio_pnl(file_path, sheet):
         merged_df['cumulative_quantity'] = merged_df['quantity'].cumsum()
         merged_df['total_cost'] = merged_df['quantity'] * merged_df['price']
         merged_df['cumulative_cost'] = merged_df['total_cost'].cumsum()
-        merged_df['average_entry_price'] = merged_df['cumulative_cost'] / merged_df['cumulative_quantity']
-        # Append the resulting dataframe for this ticker to the global dataframe
+        # Handle sells
+        merged_df['average_entry_price'] = np.where(merged_df['cumulative_quantity'] == 0, np.nan, merged_df['cumulative_cost'] / merged_df['cumulative_quantity'])
+        merged_df = merged_df.groupby('ticker').apply(lambda x: x.fillna(method='ffill'))
         result_df = pd.concat([result_df, merged_df], ignore_index=True)
 
     # Download the adjusted close price from Yahoo Finance for each ticker and date
@@ -107,13 +109,15 @@ def calculate_portfolio_pnl(file_path, sheet):
     # Calculate the notional value based on the market price
     result_df['notional_value'] = result_df['cumulative_quantity'] * result_df['market_price']
     # Calculate PnL
-    result_df['pnl'] = result_df['cumulative_quantity'] * (result_df['market_price'] - result_df['average_entry_price'])
+    result_df['unrealised_pnl'] = result_df['cumulative_quantity'] * (result_df['market_price'] - result_df['average_entry_price'])
+    result_df['realised_pnl'] = np.where(result_df['quantity'] < 0, abs(result_df['quantity']) * (result_df['price'] - result_df['average_entry_price']), 0)
+    result_df['total_pnl'] = result_df['unrealised_pnl'] + result_df['realised_pnl']
     # Sort the dataframe by date
     result_df = result_df.reset_index()
     result_df = result_df.sort_values(['date', 'index'])
     result_df = result_df.drop('index', axis=1)
     # Calculate the PNL per date
-    result_df['portfolio_pnl'] = result_df.groupby('date')['pnl'].transform('sum')
+    result_df['portfolio_pnl'] = result_df.groupby('date')['total_pnl'].transform('sum')
     # Calculate the portfolio value per date
     result_df['portfolio_cost'] = result_df.groupby('date')['cumulative_cost'].transform('sum')
     result_df['portfolio_value'] = result_df.groupby('date')['notional_value'].transform('sum')
@@ -135,11 +139,15 @@ def calculate_all_portfolio_pnl():
         if res is None:
             continue
         res = res[(res['date'] >= start_date) & (res['date'] <= end_date)]
+        group = res.groupby('ticker')['cumulative_quantity'].sum()
+        tickers = group[group == 0].index
+        res = res[~res['ticker'].isin(tickers)]
         result_dict[sheet] = res
     return result_dict
 
 
 ### Save dataframe to PDF
+# @TODO: add title
 def save_dataframe_to_pdf(title, df, file, highlight_columns=None, thresholds=None, operators=None, highlight_colour=None):
     fig, ax = plt.subplots(figsize=(12,4))
     ax.axis('tight')
@@ -186,7 +194,7 @@ def create_title_page(aum):
     if image != '':
         image_file = args.path + '/data/input/' + image
         pdf_output.image(image_file, x=55, y=150, w=100, h=100)
-    files.append('title.pdf')
+    files.append(output_dir + 'title.pdf')
     pdf_output.output(files[-1])
 
 
@@ -196,7 +204,7 @@ def get_aum(result_dict):
     portfolio_val = 0
 
     for name, df in result_dict.items():
-        res = df.loc[df['date'] == end_date].iloc[0]
+        res = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)].iloc[0]
         portfolio_val += res['portfolio_value']
 
     aum = '$' + '{:,.0f}'.format(portfolio_val)
@@ -224,7 +232,7 @@ def get_summary(result_dict, save_to_file):
     summary['Notes'] = summary['Notes'].fillna('')
 
     if save_to_file:
-        files.append('summary.pdf')
+        files.append(output_dir + 'summary.pdf')
         save_dataframe_to_pdf('Summary', summary, files[-1])
     else:
         print(summary)
@@ -265,7 +273,7 @@ def plot_performance_charts(result_dict, save_to_file):
     fig.legend(handles, labels)
 
     if save_to_file:
-        files.append('performance.pdf')
+        files.append(output_dir + 'performance.pdf')
         plt.savefig(files[-1])
     else:
         plt.show()
@@ -282,7 +290,7 @@ def new_trades(result_dict):
         tickers = ', '.join(set(tickers))
         result_df = result_df.append({'Investor': key, 'Trades': tickers}, ignore_index=True)
 
-    files.append('new_trades.pdf')
+    files.append(output_dir + 'new_trades.pdf')
     save_dataframe_to_pdf('New Trades', result_df, files[-1])
 
 
@@ -293,12 +301,12 @@ def best_and_worst(result_dict):
 
     for key, df in result_dict.items():
         start = df.loc[df['date'] == start_date]
-        end = df.loc[df['date'] == end_date]
+        end = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)]
         merged_df = pd.merge(start, end, on='ticker', suffixes=('_start', '_end'))
         total_notional = end['notional_value'].sum()
 
-        merged_df['pnl_val'] = (merged_df['pnl_end'] - merged_df['pnl_start']) / total_notional * 100
-        merged_df['pnl_pct'] = (merged_df['pnl_end'] - merged_df['pnl_start']) / abs(merged_df['pnl_start']) * 100
+        merged_df['pnl_val'] = (merged_df['total_pnl_end'] - merged_df['total_pnl_start']) / total_notional * 100
+        merged_df['pnl_pct'] = (merged_df['total_pnl_end'] - merged_df['total_pnl_start']) / abs(merged_df['total_pnl_start']) * 100
 
         best_portfolio_contribution = merged_df.loc[merged_df['pnl_val'].idxmax(), 'ticker']
         worst_portfolio_contribution = merged_df.loc[merged_df['pnl_val'].idxmin(), 'ticker']
@@ -312,7 +320,7 @@ def best_and_worst(result_dict):
                                       'Worst PnL %': worst_pnl_pct
                                       }, ignore_index=True)
 
-    files.append('best_and_worst.pdf')
+    files.append(output_dir + 'best_and_worst.pdf')
     save_dataframe_to_pdf('Best & Worst Performers', result_df, files[-1])
 
 
@@ -331,7 +339,7 @@ def plot_pie_charts(result_dict):
     for i, (key, df) in enumerate(result_dict.items()):
         row = i // num_cols
         col = i % num_cols
-        df = df.loc[df['date'] == end_date]
+        df = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)]
         axs[row][col].pie(df['notional_value'], labels=df['ticker'], autopct='%1.1f%%', radius=1.2)
         axs[row][col].set_title(key, y=1.1, fontdict={'fontsize': 14, 'fontweight': 'bold'})
 
@@ -341,7 +349,7 @@ def plot_pie_charts(result_dict):
         fig.delaxes(axs[row][col])
 
     plt.suptitle('ETF Weightings')
-    files.append('weightings.pdf')
+    files.append(output_dir + 'weightings.pdf')
     plt.savefig(files[-1])
 
 
@@ -351,7 +359,7 @@ def plot_combined_pie_chart(result_dict):
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
-        df = df.loc[df['date'] == end_date].copy()
+        df = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)].copy()
         result_df = result_df.append(df, ignore_index=True)
 
     df = result_df.groupby('ticker')['notional_value'].sum()
@@ -367,7 +375,7 @@ def plot_combined_pie_chart(result_dict):
     df.plot(kind='pie', autopct='%1.1f%%')
     plt.title('Combined ETF Weightings', fontweight='bold')
     plt.ylabel('')
-    files.append('combined.pdf')
+    files.append(output_dir + 'combined.pdf')
     plt.savefig(files[-1])
 
 
@@ -378,6 +386,7 @@ def get_metrics(result_dict):
     metrics = ['Beta (5Y Monthly)', 'Expense Ratio (net)', 'PE Ratio (TTM)', 'Yield', 'YTD Daily Total Return']
 
     for key, df in result_dict.items():
+        df = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)]
         tickers = list(df['ticker'].unique())
         for ticker in tickers:
             res = si.get_quote_table(ticker)
@@ -397,7 +406,7 @@ def get_metrics(result_dict):
     operator = config.get('Metrics', 'operator').split(',')
     highlight = config.get('Metrics', 'highlight')
 
-    files.append('metrics.pdf')
+    files.append(output_dir + 'metrics.pdf')
     if len(threshold) > 1:
         save_dataframe_to_pdf(None, result_df, files[-1], metrics, threshold, operator, highlight)
     else:
@@ -440,7 +449,7 @@ def get_top_holdings(result_dict):
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
-        df = df.loc[df['date'] == end_date]
+        df = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)]
         df = df[['ticker', 'notional_value']]
         underlyings = extract_underlyings(df['ticker'])
         underlyings = underlyings.drop_duplicates(subset=['ticker', 'Stock', 'Company'])
@@ -460,7 +469,7 @@ def get_top_holdings(result_dict):
         holdings = holdings[['Investor', 'No. of Stocks', '% of Overlap', 'Stock', 'Company', 'Weight']]
         result_df = result_df.append(holdings, ignore_index=True)
 
-    files.append('holdings.pdf')
+    files.append(output_dir + 'holdings.pdf')
     save_dataframe_to_pdf(None, result_df, files[-1])
 
 
@@ -469,6 +478,7 @@ def get_overlaps(result_dict):
     logging.info('Plotting ETF overlap heatmap')
 
     for key, df in result_dict.items():
+        df = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)]
         tickers = df['ticker'].unique()
         underlyings = extract_underlyings(tickers)
         underlyings['Stock'] = underlyings['Stock'].replace('N/A', np.nan).fillna(underlyings['Company'])
@@ -488,17 +498,17 @@ def get_overlaps(result_dict):
         sns_plot = sns.heatmap(matrix, cmap='Blues', annot=True, fmt='.2f')
         sns_plot.figure.set_size_inches(10, 7)
         sns_plot.set_title('ETF Overlaps - ' + key, fontsize=16)
-        files.append('heatmap_' + key + '.pdf')
+        files.append(output_dir + 'heatmap_' + key + '.pdf')
         pp = PdfPages(files[-1])
         pp.savefig(sns_plot.figure)
         pp.close()
 
 
 ### Merge pdf files
-def merge_pdfs(file_list, output_file):
+def merge_pdfs(input_files, output_file):
     logging.info('Merging files')
     pdf_output = pdfrw.PdfWriter()
-    for file_name in file_list:
+    for file_name in input_files:
         pdf_input = pdfrw.PdfReader(file_name)
         for page in pdf_input.pages:
             pdf_output.addpage(page)
@@ -534,7 +544,7 @@ def report():
     get_metrics(res_dict)
     get_top_holdings(res_dict)
     get_overlaps(res_dict)
-    merge_pdfs(files, args.path + '/data/output/' + config.get('Output', 'file'))
+    merge_pdfs(files, output_dir + config.get('Output', 'file'))
 
 
 if __name__ == "__main__":
