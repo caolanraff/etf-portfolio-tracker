@@ -444,14 +444,24 @@ def extract_underlyings(tickers):
     return result_df
 
 
-def get_top_holdings(result_dict):
+def extract_all_underlyings(result_dict):
+    logging.info('Downloading ETF underlyings')
+    underlyings_dict = {}
+    for key, df in result_dict.items():
+        tickers = df['ticker'].unique()
+        underlyings = extract_underlyings(tickers)
+        underlyings_dict[key] = underlyings
+    return underlyings_dict
+
+
+def get_top_holdings(result_dict, underlyings_dict):
     logging.info('Getting top holdings')
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
         df = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)]
         df = df[['ticker', 'notional_value']]
-        underlyings = extract_underlyings(df['ticker'])
+        underlyings = underlyings_dict[key]
         underlyings = underlyings.drop_duplicates(subset=['ticker', 'Stock', 'Company'])
         res = pd.merge(df, underlyings, on=['ticker'], how='left')
         res['symbol_notional'] = res['notional_value'] * (res['Weight'] / 100)
@@ -474,13 +484,12 @@ def get_top_holdings(result_dict):
 
 
 ### ETF overlap heatmap
-def get_overlaps(result_dict):
+def get_overlaps(result_dict, underlyings_dict):
     logging.info('Plotting ETF overlap heatmap')
 
     for key, df in result_dict.items():
         df = df.loc[(df['date'] == end_date) & (df['cumulative_quantity'] > 0)]
-        tickers = df['ticker'].unique()
-        underlyings = extract_underlyings(tickers)
+        underlyings = underlyings_dict[key]
         underlyings['Stock'] = underlyings['Stock'].replace('N/A', np.nan).fillna(underlyings['Company'])
         group = underlyings.groupby('ticker')['Stock'].apply(list)
         overlaps = pd.DataFrame(columns=['ETF1', 'ETF2', 'Overlap'])
@@ -542,8 +551,9 @@ def report():
     plot_pie_charts(res_dict)
     plot_combined_pie_chart(res_dict)
     get_metrics(res_dict)
-    get_top_holdings(res_dict)
-    get_overlaps(res_dict)
+    under_dict = extract_all_underlyings(res_dict)
+    get_top_holdings(res_dict, under_dict)
+    get_overlaps(res_dict, under_dict)
     merge_pdfs(files, output_dir + config.get('Output', 'file'))
 
 
