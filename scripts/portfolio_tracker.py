@@ -1,27 +1,28 @@
-import pandas as pd
-import numpy as np
-import yfinance as yf
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
 import argparse
-from yahoo_fin import stock_info as si
-from matplotlib.backends.backend_pdf import PdfPages
-import pdfrw
-import os
-from fpdf import FPDF
-import math
 import configparser
-import requests
 import json
-from bs4 import BeautifulSoup
-import re
-import seaborn as sns
 import logging
+import math
+import os
+import re
+from datetime import datetime, timedelta
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pdfrw
+import requests
+import seaborn as sns
+import yfinance as yf
+from bs4 import BeautifulSoup
+from fpdf import FPDF
+from matplotlib.backends.backend_pdf import PdfPages
+from yahoo_fin import stock_info as si
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--timeframe", type=str, help="timeframe [MTD|YTD|adhoc]")
-parser.add_argument("--start", default="", type=str, help="start date [YYYY-MM-DD]")
-parser.add_argument("--end", default="", type=str, help="end date [YYYY-MM-DD]")
+parser.add_argument("--start", default="", type=str, help="start date")
+parser.add_argument("--end", default="", type=str, help="end date")
 parser.add_argument("--report", action="store_true", help="generate PDF report")
 parser.add_argument("--path", default="./", type=str, help="directory path")
 parser.add_argument(
