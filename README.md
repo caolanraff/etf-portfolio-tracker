@@ -22,7 +22,7 @@ This will create a PDF report (example located in data/output) with the followin
 - ETF weightings
 - Combined ETF weightings
 - ETF metrics
-  - Beta, Sharpe Ratio, PE Ratio, Yield, YTD returns
+  - Beta, Expense Ratio, PE Ratio, Yield, YTD returns
   - With optional highlighing for high/low values
 - Highest weighted underlyings per portfolio
 - ETF percentage overlaps per portfolio
