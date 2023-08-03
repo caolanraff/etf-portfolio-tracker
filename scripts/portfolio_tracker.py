@@ -450,7 +450,9 @@ def best_and_worst(result_dict):
         start = max(min(df["date"]).to_pydatetime(), start_date)
         first_day = df.loc[df["date"] == start]
         last_day = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
-        merged_df = pd.merge(first_day, last_day, on="ticker", suffixes=("_start", "_end"))
+        merged_df = pd.merge(
+            first_day, last_day, on="ticker", suffixes=("_start", "_end")
+        )
         total_notional = last_day["notional_value"].sum()
 
         merged_df["pnl_val"] = (
