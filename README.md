@@ -1,16 +1,16 @@
 # portfolio-tracker
-The Python ETF portfolio tracker script allows the tracking of multiple portfolios, simply defined within an excel file.  
+The Python ETF portfolio tracker script allows the tracking of multiple portfolios, simply defined within an excel file.
 Each tab containing the trades for each portfolio that should be analysed (an example is provided in the data/input directory).
 It has two main execution options:
 1) Summary mode
 2) Report mode
 
-For summary mode, simply pass in the timeframe and the optional start/end dates.  
-The script will automatically work out the MTD and YTD timeframes if no start/end date provided.  
-This will return such information as the AUM, the portfolio returns in order of highest to lowest and two charts.  
-One chart for the overall PnL return per portfolio, and one for the specific timeframe PnL per portfolio.  
+For summary mode, simply pass in the timeframe and the optional start/end dates.
+The script will automatically work out the MTD and YTD timeframes if no start/end date provided.
+This will return such information as the AUM, the portfolio returns in order of highest to lowest and two charts.
+One chart for the overall PnL return per portfolio, and one for the specific timeframe PnL per portfolio.
 
-For report mode, an additional parameter 'report' should be passed in.  
+For report mode, an additional parameter 'report' should be passed in.
 This will create a PDF report (example located in data/output) with the following pages:
 - Title page
   - Includes AUM and optional image
@@ -58,8 +58,8 @@ python3 portfolio_tracker.py --timeframe MTD --start 2023-05-01 --end 2023-05-23
 ```
 
 ### Configuration
-There is a default.ini configuration file in the data/input directory, which will be used by default.  
-Multiple configs can be created and be passed in on an adhoc basis to create different reports.  
+There is a default.ini configuration file in the data/input directory, which will be used by default.
+Multiple configs can be created and be passed in on an adhoc basis to create different reports.
 The config settings are:
 - Input
   - file --> excel file with the trades for each portfolio across different tabs
