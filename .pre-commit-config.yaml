@@ -10,11 +10,11 @@ repos:
     hooks:
     -   id: black
 
-#-   repo: https://github.com/PyCQA/flake8
-#    rev: 6.1.0
-#    hooks:
-#    -   id: flake8
-#        args: [--ignore=E501]
+-   repo: https://github.com/PyCQA/flake8
+    rev: 6.0.0
+    hooks:
+    -   id: flake8
+        args: ["--ignore=E501,W503"]
 
 -   repo: https://github.com/pycqa/isort
     rev: 5.12.0

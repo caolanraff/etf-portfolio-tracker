@@ -67,7 +67,7 @@ files = []
 output_dir = args.path + "/data/output/"
 
 
-### Calculate pnl
+# Calculate pnl
 def calculate_portfolio_pnl(file_path, sheet):
     df = pd.read_excel(file_path, sheet_name=sheet)
     if len(df) == 0:
@@ -170,7 +170,7 @@ def calculate_portfolio_pnl(file_path, sheet):
     return result_df
 
 
-### Calculate PnL for all portfolios
+# Calculate PnL for all portfolios
 def calculate_all_portfolio_pnl():
     logging.info("Calculating portfolio PnLs")
     result_dict = {}
@@ -188,7 +188,7 @@ def calculate_all_portfolio_pnl():
     return result_dict
 
 
-### Save dataframe to PDF
+# Save dataframe to PDF
 # @TODO: add title
 def save_dataframe_to_pdf(
     title,
@@ -227,7 +227,7 @@ def save_dataframe_to_pdf(
     pp.close()
 
 
-### Create title page
+# Create title page
 def create_title_page(aum):
     pdf_output = FPDF()
     pdf_output.add_page()
@@ -248,7 +248,7 @@ def create_title_page(aum):
     pdf_output.output(files[-1])
 
 
-### Get AUM
+# Get AUM
 def get_aum(result_dict):
     logging.info("Get AUM")
     portfolio_val = 0
@@ -261,7 +261,7 @@ def get_aum(result_dict):
     return aum
 
 
-### Get summary info
+# Get summary info
 def get_summary(result_dict, save_to_file):
     logging.info("Get summary info")
     val = []
@@ -291,7 +291,7 @@ def get_summary(result_dict, save_to_file):
         print(summary)
 
 
-### Chart portfolio performances
+# Chart portfolio performances
 def plot_performance_charts(result_dict, save_to_file):
     logging.info("Plotting performance charts")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -343,7 +343,7 @@ def plot_performance_charts(result_dict, save_to_file):
         plt.show()
 
 
-### Get new trades
+# Get new trades
 def new_trades(result_dict):
     logging.info("Getting new trades")
     result_df = pd.DataFrame()
@@ -360,7 +360,7 @@ def new_trades(result_dict):
     save_dataframe_to_pdf("New Trades", result_df, files[-1])
 
 
-### Get best and worst ETFs performance
+# Get best and worst ETFs performance
 def best_and_worst(result_dict):
     logging.info("Getting best and worst ETFs")
     result_df = pd.DataFrame()
@@ -406,7 +406,7 @@ def best_and_worst(result_dict):
     save_dataframe_to_pdf("Best & Worst Performers", result_df, files[-1])
 
 
-### Plot ETF weightings pie chart
+# Plot ETF weightings pie chart
 def plot_pie_charts(result_dict):
     logging.info("Plotting ETF weightings")
     n = len(result_dict)
@@ -441,7 +441,7 @@ def plot_pie_charts(result_dict):
     plt.savefig(files[-1])
 
 
-### Plot combined ETF weightings pie chart
+# Plot combined ETF weightings pie chart
 def plot_combined_pie_chart(result_dict):
     logging.info("Plotting combined ETF weightings")
     result_df = pd.DataFrame()
@@ -467,7 +467,7 @@ def plot_combined_pie_chart(result_dict):
     plt.savefig(files[-1])
 
 
-### Get metrics
+# Get metrics
 def get_metrics(result_dict):
     logging.info("Getting metrics")
     result_df = pd.DataFrame()
@@ -511,7 +511,7 @@ def get_metrics(result_dict):
         save_dataframe_to_pdf(None, result_df, files[-1])
 
 
-### ETF holdings
+# ETF holdings
 def extract_underlyings(tickers):
     df_list = []
     for ticker in tickers:
@@ -530,8 +530,8 @@ def extract_underlyings(tickers):
             formatted_data = html[start:end].strip()
             try:
                 data = json.loads(formatted_data)
-            except:
-                logging.error("Unable to get underlyings for " + ticker)
+            except Exception as e:
+                logging.error(f"Unable to get underlyings for {ticker}: {e}")
                 continue
 
             symbols = [
@@ -601,7 +601,7 @@ def get_top_holdings(result_dict, underlyings_dict):
     save_dataframe_to_pdf(None, result_df, files[-1])
 
 
-### ETF overlap heatmap
+# ETF overlap heatmap
 def get_overlaps(result_dict, underlyings_dict):
     logging.info("Plotting ETF overlap heatmap")
 
@@ -639,7 +639,7 @@ def get_overlaps(result_dict, underlyings_dict):
         pp.close()
 
 
-### Merge pdf files
+# Merge pdf files
 def merge_pdfs(input_files, output_file):
     logging.info("Merging files")
     pdf_output = pdfrw.PdfWriter()
@@ -651,7 +651,7 @@ def merge_pdfs(input_files, output_file):
     pdf_output.write(output_file)
 
 
-### Main
+# Main
 def comp():
     logging.info(
         f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
