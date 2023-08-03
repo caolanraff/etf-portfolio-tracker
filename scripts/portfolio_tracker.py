@@ -1,3 +1,10 @@
+"""
+This script generates a report on a list of ETF portfolios defined within an Excel file.
+
+Author: Caolan Rafferty
+Date: 2023-07-02
+"""
+
 import argparse
 import configparser
 import json
@@ -67,8 +74,17 @@ files = []
 output_dir = args.path + "/data/output/"
 
 
-# Calculate pnl
 def calculate_portfolio_pnl(file_path, sheet):
+    """
+    Calculate the profit and loss (PnL) for a specific portfolio.
+
+    Args:
+        file_path (str): The path to the Excel file containing the portfolio data.
+        sheet (str): The name of the sheet within the Excel file containing the portfolio data.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the calculated PnL for the portfolio.
+    """
     df = pd.read_excel(file_path, sheet_name=sheet)
     if len(df) == 0:
         logging.warning("Tab is empty for " + sheet)
@@ -170,8 +186,13 @@ def calculate_portfolio_pnl(file_path, sheet):
     return result_df
 
 
-# Calculate PnL for all portfolios
 def calculate_all_portfolio_pnl():
+    """
+    Calculate the profit and loss (PnL) for all portfolios.
+
+    Returns:
+        dict: A dictionary containing the calculated PnL for each portfolio.
+    """
     logging.info("Calculating portfolio PnLs")
     result_dict = {}
     file = args.path + "/data/input/" + config.get("Input", "file")
@@ -188,7 +209,6 @@ def calculate_all_portfolio_pnl():
     return result_dict
 
 
-# Save dataframe to PDF
 # @TODO: add title
 def save_dataframe_to_pdf(
     title,
@@ -199,6 +219,20 @@ def save_dataframe_to_pdf(
     operators=None,
     highlight_colour=None,
 ):
+    """
+    Save a DataFrame as a PDF file with optional highlighting of cells based on specified conditions.
+
+    Args:
+        title (str): Title of the PDF document.
+        df (pandas.DataFrame): The DataFrame to be saved as a PDF.
+        file (str): The path and filename of the PDF file to be created.
+        highlight_columns (list, optional): List of column names to be highlighted. Defaults to None.
+        thresholds (list, optional): List of threshold values for highlighting. Defaults to None.
+        operators (list, optional): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
+        highlight_colour (str, optional): The colour for highlighting the cells. Defaults to None.
+    Returns:
+        None
+    """
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.axis("tight")
     ax.axis("off")
@@ -227,8 +261,15 @@ def save_dataframe_to_pdf(
     pp.close()
 
 
-# Create title page
 def create_title_page(aum):
+    """
+    Create a title page for a PDF document with specified information.
+
+    Args:
+        aum (str): Assets Under Management (AUM) value to be displayed on the title page.
+    Returns:
+        None
+    """
     pdf_output = FPDF()
     pdf_output.add_page()
     title = config.get("Text", "title")
@@ -248,8 +289,15 @@ def create_title_page(aum):
     pdf_output.output(files[-1])
 
 
-# Get AUM
 def get_aum(result_dict):
+    """
+    Calculate the Assets Under Management (AUM) based on the portfolio values in the result dictionary.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+    Returns:
+        str: The AUM value formatted as a string.
+    """
     logging.info("Get AUM")
     portfolio_val = 0
 
@@ -261,8 +309,16 @@ def get_aum(result_dict):
     return aum
 
 
-# Get summary info
 def get_summary(result_dict, save_to_file):
+    """
+    Calculate and displays or saves the summary information based on the result dictionary.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+        save_to_file (bool): Flag indicating whether to save the summary as a PDF file or print it.
+    Returns:
+        None
+    """
     logging.info("Get summary info")
     val = []
 
@@ -291,8 +347,16 @@ def get_summary(result_dict, save_to_file):
         print(summary)
 
 
-# Chart portfolio performances
 def plot_performance_charts(result_dict, save_to_file):
+    """
+    Plot performance charts based on the result dictionary and optionally save them to a file.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+        save_to_file (bool): Flag indicating whether to save the performance charts as a PDF file or display them.
+    Returns:
+        None
+    """
     logging.info("Plotting performance charts")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
     handles = []  # handles for the legend
@@ -343,8 +407,15 @@ def plot_performance_charts(result_dict, save_to_file):
         plt.show()
 
 
-# Get new trades
 def new_trades(result_dict):
+    """
+    Retrieve the new trades from the result dictionary and saves them as a PDF report.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+    Returns:
+        None
+    """
     logging.info("Getting new trades")
     result_df = pd.DataFrame()
 
@@ -360,8 +431,15 @@ def new_trades(result_dict):
     save_dataframe_to_pdf("New Trades", result_df, files[-1])
 
 
-# Get best and worst ETFs performance
 def best_and_worst(result_dict):
+    """
+    Compute the best and worst performers among the ETFs in the result dictionary and saves the results as a PDF report.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+    Returns:
+        None
+    """
     logging.info("Getting best and worst ETFs")
     result_df = pd.DataFrame()
 
@@ -406,8 +484,15 @@ def best_and_worst(result_dict):
     save_dataframe_to_pdf("Best & Worst Performers", result_df, files[-1])
 
 
-# Plot ETF weightings pie chart
 def plot_pie_charts(result_dict):
+    """
+    Plot pie charts representing ETF weightings based on the result dictionary.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+    Returns:
+        None
+    """
     logging.info("Plotting ETF weightings")
     n = len(result_dict)
     num_cols = 3
@@ -441,8 +526,15 @@ def plot_pie_charts(result_dict):
     plt.savefig(files[-1])
 
 
-# Plot combined ETF weightings pie chart
 def plot_combined_pie_chart(result_dict):
+    """
+    Plot a combined pie chart representing the combined ETF weightings based on the result dictionary.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+    Returns:
+        None
+    """
     logging.info("Plotting combined ETF weightings")
     result_df = pd.DataFrame()
 
@@ -467,8 +559,15 @@ def plot_combined_pie_chart(result_dict):
     plt.savefig(files[-1])
 
 
-# Get metrics
 def get_metrics(result_dict):
+    """
+    Retrieve and process metrics for the ETFs in the result dictionary.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+    Returns:
+        None
+    """
     logging.info("Getting metrics")
     result_df = pd.DataFrame()
     metrics = [
@@ -511,8 +610,16 @@ def get_metrics(result_dict):
         save_dataframe_to_pdf(None, result_df, files[-1])
 
 
-# ETF holdings
 def extract_underlyings(tickers):
+    """
+    Extract underlying stock information for a list of tickers.
+
+    Args:
+        tickers (list): List of tickers for which to extract underlying stock information.
+    Returns:
+        pandas.DataFrame: DataFrame containing the extracted stock information, including ticker, stock symbol,
+        company name, and weight.
+    """
     df_list = []
     for ticker in tickers:
         url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
@@ -559,9 +666,21 @@ def extract_underlyings(tickers):
 
 
 def extract_all_underlyings(result_dict):
+    """
+    Extract underlying stock information for all tickers in the result_dict.
+
+    Args:
+        result_dict (dict): A dictionary containing the result data in the form of DataFrames, where the keys represent
+        different categories and the values represent the corresponding DataFrames.
+    Returns:
+        dict: A dictionary containing the extracted stock information for each category, where the keys represent the
+        categories and the values represent the corresponding DataFrames with ticker, stock symbol, company name, and
+        weight information.
+    """
     logging.info("Downloading ETF underlyings")
     underlyings_dict = {}
     for key, df in result_dict.items():
+        df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = df["ticker"].unique()
         underlyings = extract_underlyings(tickers)
         underlyings_dict[key] = underlyings
@@ -569,6 +688,19 @@ def extract_all_underlyings(result_dict):
 
 
 def get_top_holdings(result_dict, underlyings_dict):
+    """
+    Retrieve the top holdings based on the provided result_dict and underlyings_dict.
+
+    Args:
+        result_dict (dict): A dictionary containing the result data in the form of DataFrames, where the keys represent
+        different categories and the values represent the corresponding DataFrames.
+        underlyings_dict (dict): A dictionary containing the extracted stock information for each category, where the
+        keys represent the categories and the values represent the corresponding DataFrames with ticker, stock symbol,
+        company name, and weight information.
+    Returns:
+        pandas.DataFrame: DataFrame containing the top holdings information, including investor, number of stocks,
+        percentage of overlap, stock symbol, company name, and weight.
+    """
     logging.info("Getting top holdings")
     result_df = pd.DataFrame()
 
@@ -601,12 +733,22 @@ def get_top_holdings(result_dict, underlyings_dict):
     save_dataframe_to_pdf(None, result_df, files[-1])
 
 
-# ETF overlap heatmap
 def get_overlaps(result_dict, underlyings_dict):
+    """
+    Generate an ETF overlap heatmap based on the provided result_dict and underlyings_dict.
+
+    Args:
+        result_dict (dict): A dictionary containing the result data in the form of DataFrames, where the keys represent
+        different categories and the values represent the corresponding DataFrames.
+        underlyings_dict (dict): A dictionary containing the extracted stock information for each category, where the
+        keys represent the categories and the values represent the corresponding DataFrames with ticker, stock symbol,
+        company name, and weight information.
+    Returns:
+        None
+    """
     logging.info("Plotting ETF overlap heatmap")
 
     for key, df in result_dict.items():
-        df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         underlyings = underlyings_dict[key]
         underlyings["Stock"] = (
             underlyings["Stock"].replace("N/A", np.nan).fillna(underlyings["Company"])
@@ -639,8 +781,16 @@ def get_overlaps(result_dict, underlyings_dict):
         pp.close()
 
 
-# Merge pdf files
 def merge_pdfs(input_files, output_file):
+    """
+    Merge multiple PDF files into a single PDF file.
+
+    Args:
+        input_files (list): A list of input file paths (strings) representing the PDF files to be merged.
+        output_file (str): The output file path (string) where the merged PDF file will be saved.
+    Returns:
+        None
+    """
     logging.info("Merging files")
     pdf_output = pdfrw.PdfWriter()
     for file_name in input_files:
@@ -651,8 +801,15 @@ def merge_pdfs(input_files, output_file):
     pdf_output.write(output_file)
 
 
-# Main
 def comp():
+    """Run a summary report, printing the outputs.
+
+    Run a report for a specific timeframe, calculates portfolio P&L, retrieves AUM (Assets Under Management),
+    generates a summary, and plots performance charts.
+
+    Returns:
+        None
+    """
     logging.info(
         f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
     )
@@ -664,6 +821,16 @@ def comp():
 
 
 def report():
+    """Run a comprehensive report, saving to PDF.
+
+    Run a comprehensive report for a specific timeframe, including portfolio P&L calculations, AUM retrieval,
+    title page creation, summary generation, performance chart plotting, new trades analysis, exclusion of specific
+    portfolios, best and worst performers analysis, pie chart plotting, combined pie chart plotting, metrics calculation,
+    extraction of underlyings information, top holdings retrieval, ETF overlap analysis, and merging of PDF files.
+
+    Returns:
+        None
+    """
     logging.info(
         f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
     )
