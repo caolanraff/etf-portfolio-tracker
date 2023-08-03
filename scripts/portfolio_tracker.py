@@ -325,16 +325,17 @@ def get_summary(result_dict, save_to_file):
     val = []
 
     for key, df in result_dict.items():
-        som = df.loc[df["date"] == start_date].iloc[0]
-        eom = df.loc[df["date"] == end_date].iloc[0]
+        start = max(min(df["date"]).to_pydatetime(), start_date)
+        first_day = df.loc[df["date"] == start].iloc[0]
+        last_day = df.loc[df["date"] == end_date].iloc[0]
         trades = df.loc[df["quantity"] != 0]
         pnl = (
-            (eom["portfolio_pnl"] - som["portfolio_pnl"])
-            / (som["portfolio_value"] + trades["total_cost"].sum())
+            (last_day["portfolio_pnl"] - first_day["portfolio_pnl"])
+            / (first_day["portfolio_value"] + trades["total_cost"].sum())
         ) * 100
         val.append(pnl)
 
-    summary = pd.DataFrame({"Investor": list(result_dict.keys()), timeframe: val})
+    summary = pd.DataFrame({"Portfolio": list(result_dict.keys()), timeframe: val})
     summary = summary.sort_values(by=timeframe, ascending=False)
     summary[timeframe] = summary[timeframe].round(3)
     summary = summary.reset_index(drop=True)
@@ -426,7 +427,7 @@ def new_trades(result_dict):
         tickers = trades["ticker"].to_list()
         tickers = ", ".join(set(tickers))
         result_df = result_df.append(
-            {"Investor": key, "Trades": tickers}, ignore_index=True
+            {"Portfolio": key, "Trades": tickers}, ignore_index=True
         )
 
     files.append(output_dir + "new_trades.pdf")
@@ -446,10 +447,11 @@ def best_and_worst(result_dict):
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
-        start = df.loc[df["date"] == start_date]
-        end = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
-        merged_df = pd.merge(start, end, on="ticker", suffixes=("_start", "_end"))
-        total_notional = end["notional_value"].sum()
+        start = max(min(df["date"]).to_pydatetime(), start_date)
+        first_day = df.loc[df["date"] == start]
+        last_day = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
+        merged_df = pd.merge(first_day, last_day, on="ticker", suffixes=("_start", "_end"))
+        total_notional = last_day["notional_value"].sum()
 
         merged_df["pnl_val"] = (
             (merged_df["total_pnl_end"] - merged_df["total_pnl_start"])
@@ -473,7 +475,7 @@ def best_and_worst(result_dict):
 
         result_df = result_df.append(
             {
-                "Investor": key,
+                "Portfolio": key,
                 "Best Portfolio Contributer": best_portfolio_contribution,
                 "Worst Portfolio Contributer": worst_portfolio_contribution,
                 "Best PnL %": best_pnl_pct,
@@ -587,7 +589,7 @@ def get_metrics(result_dict):
             res = si.get_quote_table(ticker)
             my_dict = {k: v for k, v in res.items() if k in metrics}
             df = pd.DataFrame([my_dict])
-            df["Investor"] = key
+            df["Portfolio"] = key
             df["Ticker"] = ticker
             result_df = result_df.append(df, ignore_index=True)
 
@@ -596,15 +598,15 @@ def get_metrics(result_dict):
     result_df["YTD Daily Total Return"] = result_df[
         "YTD Daily Total Return"
     ].str.rstrip("%")
-    result_df = result_df[["Investor", "Ticker"] + metrics]
+    result_df = result_df[["Portfolio", "Ticker"] + metrics]
 
     threshold = config.get("Metrics", "threshold").split(",")
-    threshold = [float(s) for s in threshold]
     operator = config.get("Metrics", "operator").split(",")
     highlight = config.get("Metrics", "highlight")
 
     files.append(output_dir + "metrics.pdf")
     if len(threshold) > 1:
+        threshold = [float(s) for s in threshold]
         save_dataframe_to_pdf(
             None, result_df, files[-1], metrics, threshold, operator, highlight
         )
@@ -700,7 +702,7 @@ def get_top_holdings(result_dict, underlyings_dict):
         keys represent the categories and the values represent the corresponding DataFrames with ticker, stock symbol,
         company name, and weight information.
     Returns:
-        pandas.DataFrame: DataFrame containing the top holdings information, including investor, number of stocks,
+        pandas.DataFrame: DataFrame containing the top holdings information, including portfolio, number of stocks,
         percentage of overlap, stock symbol, company name, and weight.
     """
     logging.info("Getting top holdings")
@@ -719,7 +721,7 @@ def get_top_holdings(result_dict, underlyings_dict):
         grouped["Weight"] = grouped["symbol_notional"] / total_notional * 100
         top = config.get("Holdings", "top")
         holdings = grouped.sort_values("Weight", ascending=False).head(int(top))
-        holdings["Investor"] = key
+        holdings["Portfolio"] = key
         stocks = underlyings["Stock"]
         holdings["No. of Stocks"] = len(stocks.unique())
         holdings["% of Overlap"] = round(
@@ -727,7 +729,7 @@ def get_top_holdings(result_dict, underlyings_dict):
         )
         holdings["Weight"] = [round(x, 2) for x in holdings["Weight"]]
         holdings = holdings[
-            ["Investor", "No. of Stocks", "% of Overlap", "Stock", "Company", "Weight"]
+            ["Portfolio", "No. of Stocks", "% of Overlap", "Stock", "Company", "Weight"]
         ]
         result_df = result_df.append(holdings, ignore_index=True)
 
