@@ -1,5 +1,7 @@
 """
-This script generates a report on a list of ETF portfolios defined within an Excel file.
+ETF Portfolio Tracker.
+
+This script tracks and analyses multiple ETF portfolios, given an Excel file with the trades made.
 
 Author: Caolan Rafferty
 Date: 2023-07-02

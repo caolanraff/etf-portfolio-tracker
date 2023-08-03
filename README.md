@@ -1,5 +1,5 @@
-# portfolio-tracker
-The Python ETF portfolio tracker script allows the tracking of multiple portfolios, simply defined within an excel file.
+# ETF Portfolio Tracker
+The ETF portfolio tracker allows the tracking of multiple portfolios, simply defined within an excel file.
 Each tab containing the trades for each portfolio that should be analysed (an example is provided in the data/input directory).
 It has two main execution options:
 1) Summary mode
