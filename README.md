@@ -1,6 +1,5 @@
 # ETF Portfolio Tracker
-The ETF portfolio tracker allows the tracking of multiple portfolios, simply defined within an excel file.
-Each tab containing the trades for each portfolio that should be analysed (an example is provided in the data/input directory).
+The ETF portfolio tracker allows the tracking and analysis of multiple portfolios, simply defined within an Excel file.
 It has two main execution options:
 1) Summary mode
 2) Report mode
@@ -26,7 +25,6 @@ This will create a PDF report (example located in data/output) with the followin
   - With optional highlighing for high/low values
 - Highest weighted underlyings per portfolio
 - ETF percentage overlaps per portfolio
-  - page per portfolio for easier reading
 
 ### Getting started
 Clone the project and then within the project run:
@@ -52,9 +50,9 @@ optional arguments:
 ```
 python3 portfolio_tracker.py --timeframe YTD
 
-python3 portfolio_tracker.py --timeframe MTD --start 2023-05-01 --end 2023-05-23
+python3 portfolio_tracker.py --timeframe MTD --start 2023-05-01 --end 2023-05-30
 
-python3 portfolio_tracker.py --timeframe MTD --start 2023-05-01 --end 2023-05-23 --report
+python3 portfolio_tracker.py --timeframe MTD --config config/advanced.ini --report
 ```
 
 ### Configuration
@@ -64,7 +62,6 @@ The config settings are:
 - Input
   - file --> excel file with the trades for each portfolio across different tabs
   - image --> image to be displayed on the title page
-  - exclude --> any portfolios that should be excluded from the analysis
 - Text
   - title --> title on the title page
   - best --> comments to be made about the best portfolio
@@ -72,7 +69,7 @@ The config settings are:
 - Weightings
   - other --> for the combined weights, if ETF weighting is below this value it will be moved into 'other' section
 - Metrics
-  - threshold --> list of thresholds for the outlined metircs
+  - threshold --> list of thresholds for the outlined metrics
   - operator --> the operator to check again (.e.g >, <, =)
   - highlight --> colour of highlighting
 - Holdings

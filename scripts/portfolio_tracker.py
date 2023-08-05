@@ -26,7 +26,6 @@ import yfinance as yf
 from bs4 import BeautifulSoup
 from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
-from yahoo_fin import stock_info as si
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--timeframe", type=str, help="timeframe [MTD|YTD|adhoc]")
@@ -141,6 +140,7 @@ def calculate_portfolio_pnl(file_path, sheet):
         ticker_data = yf.Ticker(ticker).history(
             start=min_date, end=max_date, auto_adjust=True
         )
+        ticker_data.index = pd.to_datetime(ticker_data.index).date
         ticker_data = ticker_data.reindex(pd.date_range(min_date, max_date, freq="D"))
         ticker_data["Close"] = ticker_data["Close"].interpolate()
         prices[ticker] = ticker_data["Close"]
@@ -443,9 +443,8 @@ def new_trades(result_dict):
         trades = df.loc[df["quantity"] != 0]
         tickers = trades["ticker"].to_list()
         tickers = ", ".join(set(tickers))
-        result_df = result_df.append(
-            {"Portfolio": key, "Trades": tickers}, ignore_index=True
-        )
+        df = pd.DataFrame({"Portfolio": [key], "Trades": [tickers]})
+        result_df = pd.concat([result_df, df], ignore_index=True)
 
     save_dataframe_to_pdf("New Trades", result_df, "new_trades.pdf")
 
@@ -491,16 +490,16 @@ def best_and_worst(result_dict):
         best_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmax(), "ticker"]
         worst_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmin(), "ticker"]
 
-        result_df = result_df.append(
+        df = pd.DataFrame(
             {
-                "Portfolio": key,
-                "Best PnL": best_portfolio_contribution,
-                "Worst PnL": worst_portfolio_contribution,
-                "Best Pct": best_pnl_pct,
-                "Worst Pct": worst_pnl_pct,
-            },
-            ignore_index=True,
+                "Portfolio": [key],
+                "Best PnL": [best_portfolio_contribution],
+                "Worst PnL": [worst_portfolio_contribution],
+                "Best Pct": [best_pnl_pct],
+                "Worst Pct": [worst_pnl_pct],
+            }
         )
+        result_df = pd.concat([result_df, df], ignore_index=True)
 
     save_dataframe_to_pdf("Best & Worst Performers", result_df, "best_and_worst.pdf")
 
@@ -561,7 +560,7 @@ def plot_combined_pie_chart(result_dict):
 
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)].copy()
-        result_df = result_df.append(df, ignore_index=True)
+        result_df = pd.concat([result_df, df], ignore_index=True)
 
     df = result_df.groupby("ticker")["notional_value"].sum()
     total_sum = df.sum()
@@ -578,6 +577,25 @@ def plot_combined_pie_chart(result_dict):
     plt.ylabel("")
     files.append(output_dir + "combined.pdf")
     plt.savefig(files[-1])
+
+
+def get_yahoo_quote_table(ticker):
+    """
+    Scrapes data elements from Yahoo Finance's quote page for a given ticker.
+
+    Args:
+        ticker (str): Ticker symbol of the desired ETF.
+    Returns:
+        dict: Dictionary containing scraped data elements with attribute-value pairs.
+    """
+    url = "https://finance.yahoo.com/quote/" + ticker + "?p=" + ticker
+    tables = pd.read_html(requests.get(url, headers={"User-agent": "Mozilla/5.0"}).text)
+    data = pd.concat([tables[0], tables[1]])
+    data.columns = ["attribute", "value"]
+    data = data.sort_values("attribute")
+    data = data.drop_duplicates().reset_index(drop=True)
+    result = {key: val for key, val in zip(data.attribute, data.value)}
+    return result
 
 
 def get_metrics(result_dict):
@@ -603,14 +621,14 @@ def get_metrics(result_dict):
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = list(df["ticker"].unique())
         for ticker in tickers:
-            res = si.get_quote_table(ticker)
+            res = get_yahoo_quote_table(ticker)
             my_dict = {
                 k: v for k, v in res.items() if k in list(metrics_mapping.keys())
             }
             df = pd.DataFrame([my_dict])
             df["Portfolio"] = key
             df["Ticker"] = ticker
-            result_df = result_df.append(df, ignore_index=True)
+            result_df = pd.concat([result_df, df], ignore_index=True)
 
     result_df["Expense Ratio (net)"] = result_df["Expense Ratio (net)"].str.rstrip("%")
     result_df["Yield"] = result_df["Yield"].str.rstrip("%")
@@ -756,7 +774,7 @@ def get_top_holdings(result_dict, underlyings_dict):
         holdings = holdings[
             ["Portfolio", "No. of Stocks", "% of Overlap", "Stock", "Company", "Weight"]
         ]
-        result_df = result_df.append(holdings, ignore_index=True)
+        result_df = pd.concat([result_df, holdings], ignore_index=True)
 
     save_dataframe_to_pdf("Top Holdings", result_df, "holdings.pdf")
 
@@ -791,9 +809,8 @@ def get_overlaps(result_dict, underlyings_dict):
                     * len(set(group[k]).intersection(set(group[i])))
                     / len(set(group[k]))
                 )
-                overlaps = overlaps.append(
-                    {"ETF1": k, "ETF2": i, "Overlap": val}, ignore_index=True
-                )
+                df = pd.DataFrame({"ETF1": [k], "ETF2": [i], "Overlap": [val]})
+                overlaps = pd.concat([overlaps, df], ignore_index=True)
 
         matrix = overlaps.pivot(index="ETF1", columns="ETF2", values="Overlap")
         matrix.index.name = None
@@ -868,10 +885,6 @@ def report():
     get_summary(res_dict, True)
     plot_performance_charts(res_dict, True)
     new_trades(res_dict)
-    exclude = config.get("Input", "exclude").split(",")
-    for key in exclude:
-        if key in res_dict:
-            del res_dict[key]
     best_and_worst(res_dict)
     plot_pie_charts(res_dict)
     plot_combined_pie_chart(res_dict)
