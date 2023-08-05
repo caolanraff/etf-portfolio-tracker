@@ -211,7 +211,6 @@ def calculate_all_portfolio_pnl():
     return result_dict
 
 
-# @TODO: add title
 def save_dataframe_to_pdf(
     title,
     df,
@@ -235,10 +234,28 @@ def save_dataframe_to_pdf(
     Returns:
         None
     """
+    max_rows = 14
+    if len(df) > max_rows:
+        dfs = np.array_split(df, np.ceil(len(df) / max_rows))
+        for i, sub_df in enumerate(dfs):
+            new_file = f"{file[:-4]}_{i}.pdf"
+            save_dataframe_to_pdf(
+                title,
+                sub_df,
+                new_file,
+                highlight_columns,
+                thresholds,
+                operators,
+                highlight_colour,
+            )
+        return
+
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.axis("tight")
     ax.axis("off")
     table = ax.table(cellText=df.values, colLabels=df.columns, loc="center")
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
     for (row, col), cell in table.get_celld().items():
         if row == 0:
             cell.set_text_props(fontweight="bold", ha="left")
@@ -256,11 +273,12 @@ def save_dataframe_to_pdf(
                             cell.set_facecolor(highlight_colour)
                         elif operators[i] == "<" and cell_value < thresholds[i]:
                             cell.set_facecolor(highlight_colour)
-    if title:
-        ax.set_title(title)
-    pp = PdfPages(file)
+
+    ax.set_title(title, fontsize=12, fontweight="bold", y=0.9)
+    pp = PdfPages(output_dir + file)
     pp.savefig(fig, bbox_inches="tight")
     pp.close()
+    files.append(output_dir + file)
 
 
 def create_title_page(aum):
@@ -344,8 +362,7 @@ def get_summary(result_dict, save_to_file):
     summary["Notes"] = summary["Notes"].fillna("")
 
     if save_to_file:
-        files.append(output_dir + "summary.pdf")
-        save_dataframe_to_pdf("Summary", summary, files[-1])
+        save_dataframe_to_pdf("Summary", summary, "summary.pdf")
     else:
         print(summary)
 
@@ -387,7 +404,7 @@ def plot_performance_charts(result_dict, save_to_file):
             labels.append(name)
         ax1.set_xlabel("Date")
         ax1.set_ylabel("PnL")
-        ax1.set_title("Overall PnL Change")
+        ax1.set_title("Overall PnL Change", fontsize=12, fontweight="bold")
         ax1.set_xlim(start_date, end_date)
 
         (line2,) = ax2.plot(group["date"], group["pnl_pct_per_date"], label=name)
@@ -396,7 +413,7 @@ def plot_performance_charts(result_dict, save_to_file):
             labels.append(name)
         ax2.set_xlabel("Date")
         ax2.set_ylabel("PnL")
-        ax2.set_title(timeframe + " PnL Change")
+        ax2.set_title(timeframe + " PnL Change", fontsize=12, fontweight="bold")
         ax2.set_xlim(start_date, end_date)
 
     for ax in (ax1, ax2):
@@ -430,8 +447,7 @@ def new_trades(result_dict):
             {"Portfolio": key, "Trades": tickers}, ignore_index=True
         )
 
-    files.append(output_dir + "new_trades.pdf")
-    save_dataframe_to_pdf("New Trades", result_df, files[-1])
+    save_dataframe_to_pdf("New Trades", result_df, "new_trades.pdf")
 
 
 def best_and_worst(result_dict):
@@ -478,16 +494,15 @@ def best_and_worst(result_dict):
         result_df = result_df.append(
             {
                 "Portfolio": key,
-                "Best Portfolio Contributer": best_portfolio_contribution,
-                "Worst Portfolio Contributer": worst_portfolio_contribution,
-                "Best PnL %": best_pnl_pct,
-                "Worst PnL %": worst_pnl_pct,
+                "Best PnL": best_portfolio_contribution,
+                "Worst PnL": worst_portfolio_contribution,
+                "Best Pct": best_pnl_pct,
+                "Worst Pct": worst_pnl_pct,
             },
             ignore_index=True,
         )
 
-    files.append(output_dir + "best_and_worst.pdf")
-    save_dataframe_to_pdf("Best & Worst Performers", result_df, files[-1])
+    save_dataframe_to_pdf("Best & Worst Performers", result_df, "best_and_worst.pdf")
 
 
 def plot_pie_charts(result_dict):
@@ -519,7 +534,7 @@ def plot_pie_charts(result_dict):
             df["notional_value"], labels=df["ticker"], autopct="%1.1f%%", radius=1.2
         )
         axs[row][col].set_title(
-            key, y=1.1, fontdict={"fontsize": 14, "fontweight": "bold"}
+            key, y=1.1, fontdict={"fontsize": 10, "fontweight": "bold"}
         )
 
     for i in range(n, num_rows * num_cols):
@@ -527,7 +542,7 @@ def plot_pie_charts(result_dict):
         col = i % num_cols
         fig.delaxes(axs[row][col])
 
-    plt.suptitle("ETF Weightings")
+    plt.suptitle("ETF Weightings", fontsize=12, fontweight="bold")
     files.append(output_dir + "weightings.pdf")
     plt.savefig(files[-1])
 
@@ -559,7 +574,7 @@ def plot_combined_pie_chart(result_dict):
 
     plt.clf()
     df.plot(kind="pie", autopct="%1.1f%%")
-    plt.title("Combined ETF Weightings", fontweight="bold")
+    plt.title("Combined ETF Weightings", fontsize=12, fontweight="bold")
     plt.ylabel("")
     files.append(output_dir + "combined.pdf")
     plt.savefig(files[-1])
@@ -576,20 +591,22 @@ def get_metrics(result_dict):
     """
     logging.info("Getting metrics")
     result_df = pd.DataFrame()
-    metrics = [
-        "Beta (5Y Monthly)",
-        "Expense Ratio (net)",
-        "PE Ratio (TTM)",
-        "Yield",
-        "YTD Daily Total Return",
-    ]
+    metrics_mapping = {
+        "Beta (5Y Monthly)": "Beta",
+        "Expense Ratio (net)": "Expense Ratio",
+        "PE Ratio (TTM)": "PE Ratio",
+        "Yield": "Dividend Yield",
+        "YTD Daily Total Return": "YTD",
+    }
 
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = list(df["ticker"].unique())
         for ticker in tickers:
             res = si.get_quote_table(ticker)
-            my_dict = {k: v for k, v in res.items() if k in metrics}
+            my_dict = {
+                k: v for k, v in res.items() if k in list(metrics_mapping.keys())
+            }
             df = pd.DataFrame([my_dict])
             df["Portfolio"] = key
             df["Ticker"] = ticker
@@ -600,20 +617,26 @@ def get_metrics(result_dict):
     result_df["YTD Daily Total Return"] = result_df[
         "YTD Daily Total Return"
     ].str.rstrip("%")
-    result_df = result_df[["Portfolio", "Ticker"] + metrics]
+    result_df = result_df[["Portfolio", "Ticker"] + list(metrics_mapping.keys())]
+    result_df = result_df.rename(columns=metrics_mapping)
 
     threshold = config.get("Metrics", "threshold").split(",")
     operator = config.get("Metrics", "operator").split(",")
     highlight = config.get("Metrics", "highlight")
 
-    files.append(output_dir + "metrics.pdf")
     if len(threshold) > 1:
         threshold = [float(s) for s in threshold]
         save_dataframe_to_pdf(
-            None, result_df, files[-1], metrics, threshold, operator, highlight
+            "Metrics",
+            result_df,
+            "metrics.pdf",
+            list(metrics_mapping.values()),
+            threshold,
+            operator,
+            highlight,
         )
     else:
-        save_dataframe_to_pdf(None, result_df, files[-1])
+        save_dataframe_to_pdf("Metrics", result_df, "metrics.pdf")
 
 
 def extract_underlyings(tickers):
@@ -735,8 +758,7 @@ def get_top_holdings(result_dict, underlyings_dict):
         ]
         result_df = result_df.append(holdings, ignore_index=True)
 
-    files.append(output_dir + "holdings.pdf")
-    save_dataframe_to_pdf(None, result_df, files[-1])
+    save_dataframe_to_pdf("Top Holdings", result_df, "holdings.pdf")
 
 
 def get_overlaps(result_dict, underlyings_dict):
@@ -780,7 +802,7 @@ def get_overlaps(result_dict, underlyings_dict):
         plt.clf()
         sns_plot = sns.heatmap(matrix, cmap="Blues", annot=True, fmt=".2f")
         sns_plot.figure.set_size_inches(10, 7)
-        sns_plot.set_title("ETF Overlaps - " + key, fontsize=16)
+        sns_plot.set_title("ETF Overlaps - " + key, fontsize=12, fontweight="bold")
         files.append(output_dir + "heatmap_" + key + ".pdf")
         pp = PdfPages(files[-1])
         pp.savefig(sns_plot.figure)
