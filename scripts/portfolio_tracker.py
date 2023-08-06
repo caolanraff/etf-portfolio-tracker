@@ -28,7 +28,9 @@ from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--timeframe", type=str, help="timeframe [MTD|YTD|adhoc]")
+parser.add_argument(
+    "--timeframe", default="MTD", type=str, help="timeframe [MTD|YTD|adhoc]"
+)
 parser.add_argument("--start", default="", type=str, help="start date")
 parser.add_argument("--end", default="", type=str, help="end date")
 parser.add_argument("--report", action="store_true", help="generate PDF report")
@@ -846,7 +848,7 @@ def merge_pdfs(input_files, output_file):
     pdf_output.write(output_file)
 
 
-def comp():
+def summary():
     """Run a summary report, printing the outputs.
 
     Run a report for a specific timeframe, calculates portfolio P&L, retrieves AUM (Assets Under Management),
@@ -899,4 +901,4 @@ if __name__ == "__main__":
     if args.report:
         report()
     else:
-        comp()
+        summary()
