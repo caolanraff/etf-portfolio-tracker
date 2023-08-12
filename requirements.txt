@@ -8,3 +8,4 @@ fpdf
 seaborn
 openpyxl
 bs4
+quantstats

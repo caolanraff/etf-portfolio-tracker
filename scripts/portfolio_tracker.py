@@ -14,12 +14,14 @@ import logging
 import math
 import os
 import re
+import sys
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pdfrw
+import quantstats as qs
 import requests
 import seaborn as sns
 import yfinance as yf
@@ -72,9 +74,46 @@ config.read(args.path + "/" + args.config)
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 pd.set_option("display.width", None)
+plt.style.use("seaborn")
+palette = [
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+]
 
 files = []
 output_dir = args.path + "/data/output/"
+ticker_data = {}
+
+
+def get_ticker_data(ticker):
+    """
+    Retrieve historical data for a given ticker symbol.
+
+    Args:
+        ticker (str): Ticker symbol for the desired ETF.
+    Returns:
+        pd.DataFrame: DataFrame containing the historical data for the specified ticker.
+    """
+    if ticker in ticker_data.keys():
+        return ticker_data[ticker]
+    try:
+        data = yf.download(ticker, progress=False)
+    except Exception as e:
+        logging.fatal(f"Unable to get data from Yahoo finance for {ticker}: {e}")
+        sys.exit()
+    data.index = pd.to_datetime(data.index).date
+    data = data.reindex(pd.date_range(min(list(data.index)), end_date, freq="D"))
+    data = data.fillna(method="ffill")
+    ticker_data[ticker] = data
+    return data
 
 
 def calculate_portfolio_pnl(file_path, sheet):
@@ -84,7 +123,6 @@ def calculate_portfolio_pnl(file_path, sheet):
     Args:
         file_path (str): The path to the Excel file containing the portfolio data.
         sheet (str): The name of the sheet within the Excel file containing the portfolio data.
-
     Returns:
         pandas.DataFrame: A DataFrame containing the calculated PnL for the portfolio.
     """
@@ -139,13 +177,9 @@ def calculate_portfolio_pnl(file_path, sheet):
     min_date = min_date - timedelta(days=7)
     prices = {}
     for ticker in result_df["ticker"].unique():
-        ticker_data = yf.Ticker(ticker).history(
-            start=min_date, end=max_date, auto_adjust=True
-        )
-        ticker_data.index = pd.to_datetime(ticker_data.index).date
-        ticker_data = ticker_data.reindex(pd.date_range(min_date, max_date, freq="D"))
-        ticker_data["Close"] = ticker_data["Close"].interpolate()
-        prices[ticker] = ticker_data["Close"]
+        data = get_ticker_data(ticker)
+        data = data.loc[min_date:max_date]["Close"]
+        prices[ticker] = data
 
     # Merge the price data onto the original dataframe
     result_df["market_price"] = result_df.apply(
@@ -381,6 +415,8 @@ def plot_performance_charts(result_dict, save_to_file):
     """
     logging.info("Plotting performance charts")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+    ax1.set_prop_cycle(color=palette)
+    ax2.set_prop_cycle(color=palette)
     handles = []  # handles for the legend
     labels = []  # labels for the legend
 
@@ -531,8 +567,13 @@ def plot_pie_charts(result_dict):
         row = i // num_cols
         col = i % num_cols
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
+        axs[row][col].set_prop_cycle(color=palette)
         axs[row][col].pie(
-            df["notional_value"], labels=df["ticker"], autopct="%1.1f%%", radius=1.2
+            df["notional_value"],
+            labels=df["ticker"],
+            autopct="%1.1f%%",
+            radius=1.2,
+            textprops={"fontsize": 8},
         )
         axs[row][col].set_title(
             key, y=1.1, fontdict={"fontsize": 10, "fontweight": "bold"}
@@ -574,7 +615,7 @@ def plot_combined_pie_chart(result_dict):
         df["Other"] = small_values.sum()
 
     plt.clf()
-    df.plot(kind="pie", autopct="%1.1f%%")
+    df.plot(kind="pie", autopct="%1.1f%%", colors=palette, textprops={"fontsize": 8})
     plt.title("Combined ETF Weightings", fontsize=12, fontweight="bold")
     plt.ylabel("")
     files.append(output_dir + "combined.pdf")
@@ -591,13 +632,36 @@ def get_yahoo_quote_table(ticker):
         dict: Dictionary containing scraped data elements with attribute-value pairs.
     """
     url = "https://finance.yahoo.com/quote/" + ticker + "?p=" + ticker
-    tables = pd.read_html(requests.get(url, headers={"User-agent": "Mozilla/5.0"}).text)
+    try:
+        tables = pd.read_html(
+            requests.get(url, headers={"User-agent": "Mozilla/5.0"}).text
+        )
+    except Exception as e:
+        logging.fatal(f"Unable to get metrics from Yahoo finance for {ticker}: {e}")
+        sys.exit()
     data = pd.concat([tables[0], tables[1]])
     data.columns = ["attribute", "value"]
     data = data.sort_values("attribute")
     data = data.drop_duplicates().reset_index(drop=True)
     result = {key: val for key, val in zip(data.attribute, data.value)}
     return result
+
+
+def calculate_sharpe_ratio(ticker):
+    """
+    Calculate the Sharpe ratio for a given ETF ticker.
+
+    Args:
+        ticker (str): The ETF ticker symbol.
+    Returns:
+        float: The Sharpe ratio.
+    """
+    data = get_ticker_data(ticker)
+    min_date = end_date - timedelta(days=5 * 365)
+    data = data.loc[min_date:end_date]
+    returns = data["Close"].pct_change()
+    sharpe = qs.stats.sharpe(returns).round(2)
+    return sharpe
 
 
 def get_metrics(result_dict):
@@ -630,6 +694,7 @@ def get_metrics(result_dict):
             df = pd.DataFrame([my_dict])
             df["Portfolio"] = key
             df["Ticker"] = ticker
+            df["Sharpe Ratio"] = calculate_sharpe_ratio(ticker)
             result_df = pd.concat([result_df, df], ignore_index=True)
 
     result_df["Expense Ratio (net)"] = result_df["Expense Ratio (net)"].str.rstrip("%")
@@ -637,9 +702,12 @@ def get_metrics(result_dict):
     result_df["YTD Daily Total Return"] = result_df[
         "YTD Daily Total Return"
     ].str.rstrip("%")
-    result_df = result_df[["Portfolio", "Ticker"] + list(metrics_mapping.keys())]
+    result_df = result_df[
+        ["Portfolio", "Ticker", "Sharpe Ratio"] + list(metrics_mapping.keys())
+    ]
     result_df = result_df.rename(columns=metrics_mapping)
 
+    fields = ["Sharpe Ratio"] + list(metrics_mapping.values())
     threshold = config.get("Metrics", "threshold").split(",")
     operator = config.get("Metrics", "operator").split(",")
     highlight = config.get("Metrics", "highlight")
@@ -650,7 +718,7 @@ def get_metrics(result_dict):
             "Metrics",
             result_df,
             "metrics.pdf",
-            list(metrics_mapping.values()),
+            fields,
             threshold,
             operator,
             highlight,
@@ -819,7 +887,9 @@ def get_overlaps(result_dict, underlyings_dict):
         matrix.columns.name = None
 
         plt.clf()
-        sns_plot = sns.heatmap(matrix, cmap="Blues", annot=True, fmt=".2f")
+        sns_plot = sns.heatmap(
+            matrix, cmap="Blues", annot=True, fmt=".2f", annot_kws={"fontsize": 8}
+        )
         sns_plot.figure.set_size_inches(10, 7)
         sns_plot.set_title("ETF Overlaps - " + key, fontsize=12, fontweight="bold")
         files.append(output_dir + "heatmap_" + key + ".pdf")
