@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 ### Usage
 ```
-$ python3 scripts/portfolio_tracker.py --help
+$ python scripts/portfolio_tracker.py --help
 usage: portfolio_tracker.py [-h] [--timeframe TIMEFRAME] [--start START] [--end END] [--config CONFIG] [--report]
 
 optional arguments:
@@ -53,11 +53,11 @@ optional arguments:
 
 ##### Examples
 ```
-python3 scripts/portfolio_tracker.py --timeframe YTD
+python scripts/portfolio_tracker.py --timeframe YTD
 
-python3 scripts/portfolio_tracker.py --timeframe MTD --start 2023-05-01 --end 2023-05-30
+python scripts/portfolio_tracker.py --timeframe MTD --start 2023-05-01 --end 2023-05-30
 
-python3 scripts/portfolio_tracker.py --timeframe MTD --config config/advanced.ini --report
+python scripts/portfolio_tracker.py --timeframe MTD --config config/advanced.ini --report
 ```
 
 ### Configuration

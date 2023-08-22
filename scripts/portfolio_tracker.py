@@ -91,6 +91,7 @@ palette = [
 files = []
 output_dir = args.path + "/data/output/"
 ticker_data = {}
+mark_price = "Adj Close"
 
 
 def get_ticker_data(ticker):
@@ -178,7 +179,7 @@ def calculate_portfolio_pnl(file_path, sheet):
     prices = {}
     for ticker in result_df["ticker"].unique():
         data = get_ticker_data(ticker)
-        data = data.loc[min_date:max_date]["Close"]
+        data = data.loc[min_date:max_date][mark_price]
         prices[ticker] = data
 
     # Merge the price data onto the original dataframe
@@ -508,38 +509,79 @@ def best_and_worst(result_dict):
         )
         total_notional = last_day["notional_value"].sum()
 
-        merged_df["pnl_val"] = (
+        merged_df["pnl_pct"] = (
             (merged_df["total_pnl_end"] - merged_df["total_pnl_start"])
             / total_notional
             * 100
         )
-        merged_df["pnl_pct"] = (
-            (merged_df["total_pnl_end"] - merged_df["total_pnl_start"])
-            / abs(merged_df["total_pnl_start"])
+        merged_df["price_pct"] = (
+            (merged_df["market_price_end"] - merged_df["market_price_start"])
+            / abs(merged_df["market_price_start"])
             * 100
         )
 
-        best_portfolio_contribution = merged_df.loc[
-            merged_df["pnl_val"].idxmax(), "ticker"
-        ]
-        worst_portfolio_contribution = merged_df.loc[
-            merged_df["pnl_val"].idxmin(), "ticker"
-        ]
         best_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmax(), "ticker"]
         worst_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmin(), "ticker"]
+        best_price_pct = merged_df.loc[merged_df["price_pct"].idxmax(), "ticker"]
+        worst_price_pct = merged_df.loc[merged_df["price_pct"].idxmin(), "ticker"]
 
         df = pd.DataFrame(
             {
                 "Portfolio": [key],
-                "Best PnL": [best_portfolio_contribution],
-                "Worst PnL": [worst_portfolio_contribution],
-                "Best Pct": [best_pnl_pct],
-                "Worst Pct": [worst_pnl_pct],
+                "Best PnL Pct": [best_pnl_pct],
+                "Worst PnL Pct": [worst_pnl_pct],
+                "Best Price Pct": [best_price_pct],
+                "Worst Price Pct": [worst_price_pct],
             }
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
     save_dataframe_to_pdf("Best & Worst Performers", result_df, "best_and_worst.pdf")
+
+
+def best_and_worst_combined(result_dict):
+    """
+    Combine the best and worst performing ETFs based on their returns.
+
+    Args:
+        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+    Returns:
+        None
+    """
+    returns = pd.DataFrame(columns=["Ticker", "Returns"])
+    result_df = pd.DataFrame()
+    tickers = []
+
+    for key, df in ticker_data.items():
+        df = df.loc[start_date:end_date]
+        first_close = df[mark_price].iloc[0]
+        last_close = df[mark_price].iloc[-1]
+        percentage_change = (last_close - first_close) / first_close * 100
+        df = pd.DataFrame({"Ticker": [key], "Returns": [round(percentage_change, 2)]})
+        returns = pd.concat([returns, df], ignore_index=True)
+
+    for key, df in result_dict.items():
+        start = max(min(df["date"]).to_pydatetime(), start_date)
+        df = df.loc[(df["date"] == start) & (df["cumulative_quantity"] > 0)]
+        tickers += df["ticker"].to_list()
+
+    returns = returns.loc[returns["Ticker"].isin(tickers)]
+    top = returns.sort_values(by="Returns", ascending=False)
+    top = top.head(5)
+    top.reset_index(drop=True, inplace=True)
+    result_df["Top 5 ETFs"] = top.apply(
+        lambda row: str(row["Ticker"]) + " (" + str(row["Returns"]) + "%)", axis=1
+    )
+    bottom = returns.sort_values(by="Returns", ascending=True)
+    bottom = bottom.head(5)
+    bottom.reset_index(drop=True, inplace=True)
+    result_df["Bottom 5 ETFs"] = bottom.apply(
+        lambda row: str(row["Ticker"]) + " (" + str(row["Returns"]) + "%)", axis=1
+    )
+
+    save_dataframe_to_pdf(
+        "Best & Worst Performers Combined", result_df, "best_and_worst_combined.pdf"
+    )
 
 
 def plot_pie_charts(result_dict):
@@ -659,7 +701,7 @@ def calculate_sharpe_ratio(ticker):
     data = get_ticker_data(ticker)
     min_date = end_date - timedelta(days=5 * 365)
     data = data.loc[min_date:end_date]
-    returns = data["Close"].pct_change()
+    returns = data[mark_price].pct_change()
     sharpe = qs.stats.sharpe(returns).round(2)
     return sharpe
 
@@ -958,6 +1000,7 @@ def report():
     plot_performance_charts(res_dict, True)
     new_trades(res_dict)
     best_and_worst(res_dict)
+    best_and_worst_combined(res_dict)
     plot_pie_charts(res_dict)
     plot_combined_pie_chart(res_dict)
     get_metrics(res_dict)
