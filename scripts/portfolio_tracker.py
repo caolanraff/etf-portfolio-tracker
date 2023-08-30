@@ -200,6 +200,7 @@ def calculate_portfolio_pnl(file_path, sheet):
         * (result_df["price"] - result_df["average_entry_price"]),
         0,
     )
+    result_df["realised_pnl"] = result_df.groupby("ticker")["realised_pnl"].cumsum()
     result_df["total_pnl"] = result_df["unrealised_pnl"] + result_df["realised_pnl"]
     # Sort the dataframe by date
     result_df = result_df.reset_index()
@@ -894,6 +895,9 @@ def get_top_holdings(result_dict, underlyings_dict):
         holdings["Portfolio"] = key
         stocks = underlyings["Stock"]
         holdings["No. of Stocks"] = len(stocks.unique())
+        holdings["No. of Stocks"] = holdings["No. of Stocks"].apply(
+            lambda x: "{:,.0f}".format(x)
+        )
         holdings["% of Overlap"] = round(
             100 * (len(stocks) - len(stocks.unique())) / len(stocks), 2
         )
