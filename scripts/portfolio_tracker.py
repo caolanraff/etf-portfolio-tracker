@@ -15,6 +15,7 @@ import math
 import os
 import re
 import sys
+import warnings
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
@@ -41,6 +42,8 @@ parser.add_argument(
     "--config", default="config/default.ini", type=str, help="config file"
 )
 args = parser.parse_args()
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -330,7 +333,7 @@ def create_title_page(aum):
     """
     pdf_output = FPDF()
     pdf_output.add_page()
-    title = config.get("Text", "title")
+    title = config.get("TitlePage", "title")
     subtitle = end_date.strftime("%B %Y") + " Meeting"
     aum = "AUM: " + aum
     pdf_output.set_font("Arial", "B", 36)
@@ -339,7 +342,7 @@ def create_title_page(aum):
     pdf_output.cell(0, 20, subtitle, 0, 1, "C")
     pdf_output.set_font("Arial", "", 16)
     pdf_output.cell(0, 20, aum, 0, 1, "C")
-    image = config.get("Input", "image")
+    image = config.get("TitlePage", "image")
     if image != "":
         image_file = args.path + "/data/input/" + image
         pdf_output.image(image_file, x=55, y=150, w=100, h=100)
@@ -395,8 +398,8 @@ def get_summary(result_dict, save_to_file):
     summary = summary.sort_values(by=timeframe, ascending=False)
     summary[timeframe] = summary[timeframe].round(3)
     summary = summary.reset_index(drop=True)
-    summary.loc[0, "Notes"] = config.get("Text", "best")
-    summary.loc[summary.index[-1], "Notes"] = config.get("Text", "worst")
+    summary.loc[0, "Notes"] = config.get("SummaryPage", "best")
+    summary.loc[summary.index[-1], "Notes"] = config.get("SummaryPage", "worst")
     summary["Notes"] = summary["Notes"].fillna("")
 
     if save_to_file:
@@ -480,10 +483,15 @@ def new_trades(result_dict):
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
-        trades = df.loc[df["quantity"] != 0]
-        tickers = trades["ticker"].to_list()
-        tickers = ", ".join(set(tickers))
-        df = pd.DataFrame({"Portfolio": [key], "Trades": [tickers]})
+        buys = df.loc[df["quantity"] > 0]["ticker"].to_list()
+        sells = df.loc[df["quantity"] < 0]["ticker"].to_list()
+        df = pd.DataFrame(
+            {
+                "Portfolio": [key],
+                "Buys": [", ".join(set(buys))],
+                "Sells": [", ".join(set(sells))],
+            }
+        )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
     save_dataframe_to_pdf("New Trades", result_df, "new_trades.pdf")
@@ -521,18 +529,29 @@ def best_and_worst(result_dict):
             * 100
         )
 
-        best_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmax(), "ticker"]
-        worst_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmin(), "ticker"]
         best_price_pct = merged_df.loc[merged_df["price_pct"].idxmax(), "ticker"]
+        max_price_pct = round(merged_df["price_pct"].max(), 2)
+        best_price_pct = f"{best_price_pct} ({max_price_pct}%)"
+
         worst_price_pct = merged_df.loc[merged_df["price_pct"].idxmin(), "ticker"]
+        min_price_pct = round(merged_df["price_pct"].min(), 2)
+        worst_price_pct = f"{worst_price_pct} ({min_price_pct}%)"
+
+        best_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmax(), "ticker"]
+        max_pnl_pct = round(merged_df["pnl_pct"].max(), 2)
+        best_pnl_pct = f"{best_pnl_pct} ({max_pnl_pct}%)"
+
+        worst_pnl_pct = merged_df.loc[merged_df["pnl_pct"].idxmin(), "ticker"]
+        min_pnl_pct = round(merged_df["pnl_pct"].min(), 2)
+        worst_pnl_pct = f"{worst_pnl_pct} ({min_pnl_pct}%)"
 
         df = pd.DataFrame(
             {
                 "Portfolio": [key],
-                "Best PnL Pct": [best_pnl_pct],
-                "Worst PnL Pct": [worst_pnl_pct],
                 "Best Price Pct": [best_price_pct],
                 "Worst Price Pct": [worst_price_pct],
+                "Best PnL Pct": [best_pnl_pct],
+                "Worst PnL Pct": [worst_pnl_pct],
             }
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
@@ -650,7 +669,7 @@ def plot_combined_pie_chart(result_dict):
 
     df = result_df.groupby("ticker")["notional_value"].sum()
     total_sum = df.sum()
-    other = float(config.get("Weightings", "other"))
+    other = float(config.get("WeightingsPage", "other"))
     threshold = other * total_sum
     small_values = df[df < threshold]
     if len(small_values) > 0:
@@ -751,9 +770,9 @@ def get_metrics(result_dict):
     result_df = result_df.rename(columns=metrics_mapping)
 
     fields = ["Sharpe Ratio"] + list(metrics_mapping.values())
-    threshold = config.get("Metrics", "threshold").split(",")
-    operator = config.get("Metrics", "operator").split(",")
-    highlight = config.get("Metrics", "highlight")
+    threshold = config.get("MetricsPage", "threshold").split(",")
+    operator = config.get("MetricsPage", "operator").split(",")
+    highlight = config.get("MetricsPage", "highlight")
 
     if len(threshold) > 1:
         threshold = [float(s) for s in threshold]
@@ -885,13 +904,16 @@ def get_top_holdings(result_dict, underlyings_dict):
         underlyings = underlyings_dict[key]
         underlyings = underlyings.drop_duplicates(subset=["ticker", "Stock", "Company"])
         res = pd.merge(df, underlyings, on=["ticker"], how="left")
+        res["Company"] = res["Company"].str.rstrip(".")
         res["symbol_notional"] = res["notional_value"] * (res["Weight"] / 100)
         grouped = res.groupby(["Stock", "Company"])["symbol_notional"].sum()
         grouped = grouped.reset_index()
         total_notional = df["notional_value"].sum()
         grouped["Weight"] = grouped["symbol_notional"] / total_notional * 100
-        top = config.get("Holdings", "top")
-        holdings = grouped.sort_values("Weight", ascending=False).head(int(top))
+        num_of_companies = config.get("HoldingsPage", "num_of_companies")
+        holdings = grouped.sort_values("Weight", ascending=False).head(
+            int(num_of_companies)
+        )
         holdings["Portfolio"] = key
         stocks = underlyings["Stock"]
         holdings["No. of Stocks"] = len(stocks.unique())
@@ -907,7 +929,20 @@ def get_top_holdings(result_dict, underlyings_dict):
         ]
         result_df = pd.concat([result_df, holdings], ignore_index=True)
 
-    save_dataframe_to_pdf("Top Holdings", result_df, "holdings.pdf")
+    threshold = config.get("HoldingsPage", "threshold")
+
+    if len(threshold) > 0:
+        save_dataframe_to_pdf(
+            "Top Holdings",
+            result_df,
+            "holdings.pdf",
+            ["Weight"],
+            [float(threshold)],
+            [">"],
+            "red",
+        )
+    else:
+        save_dataframe_to_pdf("Top Holdings", result_df, "holdings.pdf")
 
 
 def get_overlaps(result_dict, underlyings_dict):
