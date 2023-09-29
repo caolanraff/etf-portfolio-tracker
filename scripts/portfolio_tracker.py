@@ -470,7 +470,7 @@ def plot_performance_charts(result_dict, save_to_file):
         plt.show()
 
 
-def new_trades(result_dict):
+def create_new_trades_page(result_dict):
     """
     Retrieve the new trades from the result dictionary and saves them as a PDF report.
 
@@ -497,7 +497,7 @@ def new_trades(result_dict):
     save_dataframe_to_pdf("New Trades", result_df, "new_trades.pdf")
 
 
-def best_and_worst(result_dict):
+def create_best_and_worst_page(result_dict):
     """
     Compute the best and worst performers among the ETFs in the result dictionary and saves the results as a PDF report.
 
@@ -559,7 +559,7 @@ def best_and_worst(result_dict):
     save_dataframe_to_pdf("Best & Worst Performers", result_df, "best_and_worst.pdf")
 
 
-def best_and_worst_combined(result_dict):
+def create_best_and_worst_combined_page(result_dict):
     """
     Combine the best and worst performing ETFs based on their returns.
 
@@ -726,7 +726,7 @@ def calculate_sharpe_ratio(ticker):
     return sharpe
 
 
-def get_metrics(result_dict):
+def create_metrics_page(result_dict):
     """
     Retrieve and process metrics for the ETFs in the result dictionary.
 
@@ -803,7 +803,7 @@ def initcap(string):
     return " ".join(capitalized_words)
 
 
-def extract_underlyings(tickers):
+def get_underlyings(tickers):
     """
     Extract underlying stock information for a list of tickers.
 
@@ -859,7 +859,7 @@ def extract_underlyings(tickers):
     return result_df
 
 
-def extract_all_underlyings(result_dict):
+def get_all_underlyings(result_dict):
     """
     Extract underlying stock information for all tickers in the result_dict.
 
@@ -876,12 +876,12 @@ def extract_all_underlyings(result_dict):
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = df["ticker"].unique()
-        underlyings = extract_underlyings(tickers)
+        underlyings = get_underlyings(tickers)
         underlyings_dict[key] = underlyings
     return underlyings_dict
 
 
-def get_top_holdings(result_dict, underlyings_dict):
+def create_top_holdings_page(result_dict, underlyings_dict):
     """
     Retrieve the top holdings based on the provided result_dict and underlyings_dict.
 
@@ -945,7 +945,7 @@ def get_top_holdings(result_dict, underlyings_dict):
         save_dataframe_to_pdf("Top Holdings", result_df, "holdings.pdf")
 
 
-def get_overlaps(result_dict, underlyings_dict):
+def create_overlaps_page(result_dict, underlyings_dict):
     """
     Generate an ETF overlap heatmap based on the provided result_dict and underlyings_dict.
 
@@ -1052,15 +1052,15 @@ def report():
     create_title_page(aum)
     get_summary(res_dict, True)
     plot_performance_charts(res_dict, True)
-    new_trades(res_dict)
-    best_and_worst(res_dict)
-    best_and_worst_combined(res_dict)
+    create_new_trades_page(res_dict)
+    create_best_and_worst_page(res_dict)
+    create_best_and_worst_combined_page(res_dict)
     plot_pie_charts(res_dict)
     plot_combined_pie_chart(res_dict)
-    get_metrics(res_dict)
-    under_dict = extract_all_underlyings(res_dict)
-    get_top_holdings(res_dict, under_dict)
-    get_overlaps(res_dict, under_dict)
+    create_metrics_page(res_dict)
+    under_dict = get_all_underlyings(res_dict)
+    create_top_holdings_page(res_dict, under_dict)
+    create_overlaps_page(res_dict, under_dict)
     merge_pdfs(files, output_dir + config.get("Output", "file"))
 
 
