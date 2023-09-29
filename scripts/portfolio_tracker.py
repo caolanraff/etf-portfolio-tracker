@@ -17,6 +17,7 @@ import re
 import sys
 import warnings
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -48,6 +49,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
+
+DictFrame = Dict[str, pd.DataFrame]
 
 timeframe = args.timeframe
 start_date = args.start
@@ -93,18 +96,18 @@ palette = [
 
 files = []
 output_dir = args.path + "/data/output/"
-ticker_data = {}
+ticker_data: DictFrame = {}
 mark_price = "Adj Close"
 
 
-def get_ticker_data(ticker):
+def get_ticker_data(ticker: str) -> pd.DataFrame:
     """
     Retrieve historical data for a given ticker symbol.
 
     Args:
-        ticker (str): Ticker symbol for the desired ETF.
+        ticker: Ticker symbol for the desired ETF.
     Returns:
-        pd.DataFrame: DataFrame containing the historical data for the specified ticker.
+        DataFrame containing the historical data for the specified ticker.
     """
     if ticker in ticker_data.keys():
         return ticker_data[ticker]
@@ -120,15 +123,15 @@ def get_ticker_data(ticker):
     return data
 
 
-def calculate_portfolio_pnl(file_path, sheet):
+def calculate_portfolio_pnl(file_path: str, sheet: str) -> pd.DataFrame:
     """
     Calculate the profit and loss (PnL) for a specific portfolio.
 
     Args:
-        file_path (str): The path to the Excel file containing the portfolio data.
-        sheet (str): The name of the sheet within the Excel file containing the portfolio data.
+        file_path: The path to the Excel file containing the portfolio data.
+        sheet: The name of the sheet within the Excel file containing the portfolio data.
     Returns:
-        pandas.DataFrame: A DataFrame containing the calculated PnL for the portfolio.
+        A DataFrame containing the calculated PnL for the portfolio.
     """
     df = pd.read_excel(file_path, sheet_name=sheet)
     if len(df) == 0:
@@ -229,12 +232,12 @@ def calculate_portfolio_pnl(file_path, sheet):
     return result_df
 
 
-def calculate_all_portfolio_pnl():
+def calculate_all_portfolio_pnl() -> DictFrame:
     """
     Calculate the profit and loss (PnL) for all portfolios.
 
     Returns:
-        dict: A dictionary containing the calculated PnL for each portfolio.
+        A dictionary containing the calculated PnL for each portfolio.
     """
     logging.info("Calculating portfolio PnLs")
     result_dict = {}
@@ -253,27 +256,25 @@ def calculate_all_portfolio_pnl():
 
 
 def save_dataframe_to_pdf(
-    title,
-    df,
-    file,
-    highlight_columns=None,
-    thresholds=None,
-    operators=None,
-    highlight_colour=None,
-):
+    title: str,
+    df: pd.DataFrame,
+    file: str,
+    highlight_columns: Optional[List[str]] = None,
+    thresholds: Optional[List[float]] = None,
+    operators: Optional[List[str]] = None,
+    highlight_colour: Optional[str] = None,
+) -> None:
     """
     Save a DataFrame as a PDF file with optional highlighting of cells based on specified conditions.
 
     Args:
-        title (str): Title of the PDF document.
-        df (pandas.DataFrame): The DataFrame to be saved as a PDF.
-        file (str): The path and filename of the PDF file to be created.
-        highlight_columns (list, optional): List of column names to be highlighted. Defaults to None.
-        thresholds (list, optional): List of threshold values for highlighting. Defaults to None.
-        operators (list, optional): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
-        highlight_colour (str, optional): The colour for highlighting the cells. Defaults to None.
-    Returns:
-        None
+        title: Title of the PDF document.
+        df: The DataFrame to be saved as a PDF.
+        file: The path and filename of the PDF file to be created.
+        highlight_columns: List of column names to be highlighted. Defaults to None.
+        thresholds: List of threshold values for highlighting. Defaults to None.
+        operators: List of comparison operators ('>' or '<') for highlighting. Defaults to None.
+        highlight_colour: The colour for highlighting the cells. Defaults to None.
     """
     max_rows = 14
     if len(df) > max_rows:
@@ -322,14 +323,12 @@ def save_dataframe_to_pdf(
     files.append(output_dir + file)
 
 
-def create_title_page(aum):
+def create_title_page(aum: str) -> None:
     """
     Create a title page for a PDF document with specified information.
 
     Args:
-        aum (str): Assets Under Management (AUM) value to be displayed on the title page.
-    Returns:
-        None
+        aum: Assets Under Management (AUM) value to be displayed on the title page.
     """
     pdf_output = FPDF()
     pdf_output.add_page()
@@ -350,14 +349,14 @@ def create_title_page(aum):
     pdf_output.output(files[-1])
 
 
-def get_aum(result_dict):
+def get_aum(result_dict: DictFrame) -> str:
     """
     Calculate the Assets Under Management (AUM) based on the portfolio values in the result dictionary.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
     Returns:
-        str: The AUM value formatted as a string.
+        The AUM value formatted as a string.
     """
     logging.info("Get AUM")
     portfolio_val = 0
@@ -370,15 +369,13 @@ def get_aum(result_dict):
     return aum
 
 
-def get_summary(result_dict, save_to_file):
+def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
     """
     Calculate and displays or saves the summary information based on the result dictionary.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-        save_to_file (bool): Flag indicating whether to save the summary as a PDF file or print it.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
+        save_to_file: Flag indicating whether to save the summary as a PDF file or print it.
     """
     logging.info("Get summary info")
     val = []
@@ -408,15 +405,13 @@ def get_summary(result_dict, save_to_file):
         print(summary)
 
 
-def plot_performance_charts(result_dict, save_to_file):
+def plot_performance_charts(result_dict: DictFrame, save_to_file: bool) -> None:
     """
     Plot performance charts based on the result dictionary and optionally save them to a file.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-        save_to_file (bool): Flag indicating whether to save the performance charts as a PDF file or display them.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
+        save_to_file: Flag indicating whether to save the performance charts as a PDF file or display them.
     """
     logging.info("Plotting performance charts")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -470,14 +465,12 @@ def plot_performance_charts(result_dict, save_to_file):
         plt.show()
 
 
-def create_new_trades_page(result_dict):
+def create_new_trades_page(result_dict: DictFrame) -> None:
     """
     Retrieve the new trades from the result dictionary and saves them as a PDF report.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
     logging.info("Getting new trades")
     result_df = pd.DataFrame()
@@ -497,14 +490,12 @@ def create_new_trades_page(result_dict):
     save_dataframe_to_pdf("New Trades", result_df, "new_trades.pdf")
 
 
-def create_best_and_worst_page(result_dict):
+def create_best_and_worst_page(result_dict: DictFrame) -> None:
     """
     Compute the best and worst performers among the ETFs in the result dictionary and saves the results as a PDF report.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
     logging.info("Getting best and worst ETFs")
     result_df = pd.DataFrame()
@@ -559,14 +550,12 @@ def create_best_and_worst_page(result_dict):
     save_dataframe_to_pdf("Best & Worst Performers", result_df, "best_and_worst.pdf")
 
 
-def create_best_and_worst_combined_page(result_dict):
+def create_best_and_worst_combined_page(result_dict: DictFrame) -> None:
     """
     Combine the best and worst performing ETFs based on their returns.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
     returns = pd.DataFrame(columns=["Ticker", "Returns"])
     result_df = pd.DataFrame()
@@ -604,14 +593,12 @@ def create_best_and_worst_combined_page(result_dict):
     )
 
 
-def plot_pie_charts(result_dict):
+def plot_pie_charts(result_dict: DictFrame) -> None:
     """
     Plot pie charts representing ETF weightings based on the result dictionary.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
     logging.info("Plotting ETF weightings")
     n = len(result_dict)
@@ -651,14 +638,12 @@ def plot_pie_charts(result_dict):
     plt.savefig(files[-1])
 
 
-def plot_combined_pie_chart(result_dict):
+def plot_combined_pie_chart(result_dict: DictFrame) -> None:
     """
     Plot a combined pie chart representing the combined ETF weightings based on the result dictionary.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
     logging.info("Plotting combined ETF weightings")
     result_df = pd.DataFrame()
@@ -684,14 +669,14 @@ def plot_combined_pie_chart(result_dict):
     plt.savefig(files[-1])
 
 
-def get_yahoo_quote_table(ticker):
+def get_yahoo_quote_table(ticker: str) -> DictFrame:
     """
     Scrapes data elements from Yahoo Finance's quote page for a given ticker.
 
     Args:
-        ticker (str): Ticker symbol of the desired ETF.
+        ticker: Ticker symbol of the desired ETF.
     Returns:
-        dict: Dictionary containing scraped data elements with attribute-value pairs.
+        Dictionary containing scraped data elements with attribute-value pairs.
     """
     url = "https://finance.yahoo.com/quote/" + ticker + "?p=" + ticker
     try:
@@ -709,31 +694,29 @@ def get_yahoo_quote_table(ticker):
     return result
 
 
-def calculate_sharpe_ratio(ticker):
+def calculate_sharpe_ratio(ticker: str) -> float:
     """
     Calculate the Sharpe ratio for a given ETF ticker.
 
     Args:
-        ticker (str): The ETF ticker symbol.
+        ticker: The ETF ticker symbol.
     Returns:
-        float: The Sharpe ratio.
+        The Sharpe ratio.
     """
     data = get_ticker_data(ticker)
     min_date = end_date - timedelta(days=5 * 365)
     data = data.loc[min_date:end_date]
     returns = data[mark_price].pct_change()
     sharpe = qs.stats.sharpe(returns).round(2)
-    return sharpe
+    return float(sharpe)
 
 
-def create_metrics_page(result_dict):
+def create_metrics_page(result_dict: DictFrame) -> None:
     """
     Retrieve and process metrics for the ETFs in the result dictionary.
 
     Args:
-        result_dict (dict): A dictionary containing portfolio data as DataFrame objects.
-    Returns:
-        None
+        result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
     logging.info("Getting metrics")
     result_df = pd.DataFrame()
@@ -775,13 +758,12 @@ def create_metrics_page(result_dict):
     highlight = config.get("MetricsPage", "highlight")
 
     if len(threshold) > 1:
-        threshold = [float(s) for s in threshold]
         save_dataframe_to_pdf(
             "Metrics",
             result_df,
             "metrics.pdf",
             fields,
-            threshold,
+            [float(s) for s in threshold],
             operator,
             highlight,
         )
@@ -789,28 +771,65 @@ def create_metrics_page(result_dict):
         save_dataframe_to_pdf("Metrics", result_df, "metrics.pdf")
 
 
-def initcap(string):
+def initcap(string: str) -> str:
     """
     Convert a string to initcap format.
 
     Args:
-        string (str): The input string to be converted.
+        string: The input string to be converted.
     Returns:
-        str: The input string converted to initcap format, where the first letter of each word is capitalized.
+        The input string converted to initcap format, where the first letter of each word is capitalized.
     """
     words = string.lower().split()
     capitalized_words = [word.capitalize() for word in words]
     return " ".join(capitalized_words)
 
 
-def get_underlyings(tickers):
+def get_symbol_from_html(item: str) -> str:
+    """
+    Get ticker symbol from HTML string.
+
+    Args:
+        item: HTML string
+    Returns:
+        ticker
+    """
+    if len(item) <= 10:
+        return item
+    else:
+        soup = BeautifulSoup(item, "html.parser")
+        anchor_tag = soup.find("a")
+        if anchor_tag:
+            rel_attr = anchor_tag.get("rel")
+            if rel_attr:
+                return str(rel_attr[0])
+    return ""
+
+
+def get_name_from_html(item: str) -> str:
+    """
+    Get company name from HTML string.
+
+    Args:
+        item: HTML string
+    Returns:
+        Company name
+    """
+    title_match = re.search('title="([^"]+)"', item)
+    if title_match:
+        return title_match.group(1).split("-", 1)[0]
+    else:
+        return item
+
+
+def get_underlyings(tickers: List[str]) -> pd.DataFrame:
     """
     Extract underlying stock information for a list of tickers.
 
     Args:
-        tickers (list): List of tickers for which to extract underlying stock information.
+        tickers: List of tickers for which to extract underlying stock information.
     Returns:
-        pandas.DataFrame: DataFrame containing the extracted stock information, including ticker, stock symbol,
+        DataFrame containing the extracted stock information, including ticker, stock symbol,
         company name, and weight.
     """
     df_list = []
@@ -820,8 +839,8 @@ def get_underlyings(tickers):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"
         }
         with requests.Session() as req:
-            req.headers.update(headers)
-            r = req.get(url)
+            req.headers.update(headers)  # type: ignore
+            r = req.get(url)  # type: ignore
             html = r.text
             start = html.find("etf_holdings.formatted_data = ") + len(
                 "etf_holdings.formatted_data = "
@@ -834,20 +853,8 @@ def get_underlyings(tickers):
                 logging.error(f"Unable to get underlyings for {ticker}: {e}")
                 continue
 
-            symbols = [
-                item[1]
-                if len(item[1]) <= 10
-                else BeautifulSoup(item[1], "html.parser").find("a").get("rel")[0]
-                if BeautifulSoup(item[1], "html.parser").find("a")
-                else ""
-                for item in data
-            ]
-            names = [
-                re.search('title="([^"]+)"', item[0]).group(1).split("-", 1)[0]
-                if "title=" in item[0]
-                else item[0]
-                for item in data
-            ]
+            symbols = [get_symbol_from_html(item[1]) for item in data]
+            names = [get_name_from_html(item[0]) for item in data]
             weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
 
             df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
@@ -859,15 +866,15 @@ def get_underlyings(tickers):
     return result_df
 
 
-def get_all_underlyings(result_dict):
+def get_all_underlyings(result_dict: DictFrame) -> DictFrame:
     """
     Extract underlying stock information for all tickers in the result_dict.
 
     Args:
-        result_dict (dict): A dictionary containing the result data in the form of DataFrames, where the keys represent
+        result_dict: A dictionary containing the result data in the form of DataFrames, where the keys represent
         different categories and the values represent the corresponding DataFrames.
     Returns:
-        dict: A dictionary containing the extracted stock information for each category, where the keys represent the
+        A dictionary containing the extracted stock information for each category, where the keys represent the
         categories and the values represent the corresponding DataFrames with ticker, stock symbol, company name, and
         weight information.
     """
@@ -881,18 +888,20 @@ def get_all_underlyings(result_dict):
     return underlyings_dict
 
 
-def create_top_holdings_page(result_dict, underlyings_dict):
+def create_top_holdings_page(
+    result_dict: DictFrame, underlyings_dict: DictFrame
+) -> pd.DataFrame:
     """
     Retrieve the top holdings based on the provided result_dict and underlyings_dict.
 
     Args:
-        result_dict (dict): A dictionary containing the result data in the form of DataFrames, where the keys represent
+        result_dict: A dictionary containing the result data in the form of DataFrames, where the keys represent
         different categories and the values represent the corresponding DataFrames.
-        underlyings_dict (dict): A dictionary containing the extracted stock information for each category, where the
+        underlyings_dict: A dictionary containing the extracted stock information for each category, where the
         keys represent the categories and the values represent the corresponding DataFrames with ticker, stock symbol,
         company name, and weight information.
     Returns:
-        pandas.DataFrame: DataFrame containing the top holdings information, including portfolio, number of stocks,
+        DataFrame containing the top holdings information, including portfolio, number of stocks,
         percentage of overlap, stock symbol, company name, and weight.
     """
     logging.info("Getting top holdings")
@@ -945,18 +954,16 @@ def create_top_holdings_page(result_dict, underlyings_dict):
         save_dataframe_to_pdf("Top Holdings", result_df, "holdings.pdf")
 
 
-def create_overlaps_page(result_dict, underlyings_dict):
+def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) -> None:
     """
     Generate an ETF overlap heatmap based on the provided result_dict and underlyings_dict.
 
     Args:
-        result_dict (dict): A dictionary containing the result data in the form of DataFrames, where the keys represent
+        result_dict: A dictionary containing the result data in the form of DataFrames, where the keys represent
         different categories and the values represent the corresponding DataFrames.
-        underlyings_dict (dict): A dictionary containing the extracted stock information for each category, where the
+        underlyings_dict: A dictionary containing the extracted stock information for each category, where the
         keys represent the categories and the values represent the corresponding DataFrames with ticker, stock symbol,
         company name, and weight information.
-    Returns:
-        None
     """
     logging.info("Plotting ETF overlap heatmap")
 
@@ -994,15 +1001,13 @@ def create_overlaps_page(result_dict, underlyings_dict):
         pp.close()
 
 
-def merge_pdfs(input_files, output_file):
+def merge_pdfs(input_files: List[str], output_file: str) -> None:
     """
     Merge multiple PDF files into a single PDF file.
 
     Args:
-        input_files (list): A list of input file paths (strings) representing the PDF files to be merged.
-        output_file (str): The output file path (string) where the merged PDF file will be saved.
-    Returns:
-        None
+        input_files: A list of input file paths (strings) representing the PDF files to be merged.
+        output_file: The output file path (string) where the merged PDF file will be saved.
     """
     logging.info("Merging files")
     pdf_output = pdfrw.PdfWriter()
@@ -1014,14 +1019,11 @@ def merge_pdfs(input_files, output_file):
     pdf_output.write(output_file)
 
 
-def summary():
+def summary() -> None:
     """Run a summary report, printing the outputs.
 
     Run a report for a specific timeframe, calculates portfolio P&L, retrieves AUM (Assets Under Management),
     generates a summary, and plots performance charts.
-
-    Returns:
-        None
     """
     logging.info(
         f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
@@ -1033,16 +1035,13 @@ def summary():
     plot_performance_charts(res_dict, False)
 
 
-def report():
+def report() -> None:
     """Run a comprehensive report, saving to PDF.
 
     Run a comprehensive report for a specific timeframe, including portfolio P&L calculations, AUM retrieval,
     title page creation, summary generation, performance chart plotting, new trades analysis, exclusion of specific
     portfolios, best and worst performers analysis, pie chart plotting, combined pie chart plotting, metrics calculation,
     extraction of underlyings information, top holdings retrieval, ETF overlap analysis, and merging of PDF files.
-
-    Returns:
-        None
     """
     logging.info(
         f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
