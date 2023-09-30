@@ -9,13 +9,12 @@ Date: 2023-07-02
 
 import argparse
 import configparser
-import json
 import logging
 import math
 import sys
 import warnings
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,6 +27,7 @@ from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
 import utils.utils as util
+from utils.data import get_etf_underlyings
 from utils.utils import saved_pdf_files
 
 parser = argparse.ArgumentParser()
@@ -710,51 +710,7 @@ def create_metrics_page(result_dict: DictFrame) -> None:
         util.df_to_pdf("Metrics", result_df, file)
 
 
-def get_underlyings(tickers: List[str]) -> pd.DataFrame:
-    """
-    Extract underlying stock information for a list of tickers.
-
-    Args:
-        tickers: List of tickers for which to extract underlying stock information.
-    Returns:
-        DataFrame containing the extracted stock information, including ticker, stock symbol,
-        company name, and weight.
-    """
-    df_list = []
-    for ticker in tickers:
-        url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"
-        }
-        with requests.Session() as req:
-            req.headers.update(headers)  # type: ignore
-            r = req.get(url)  # type: ignore
-            html = r.text
-            start = html.find("etf_holdings.formatted_data = ") + len(
-                "etf_holdings.formatted_data = "
-            )
-            end = html.find(";", start)
-            formatted_data = html[start:end].strip()
-            try:
-                data = json.loads(formatted_data)
-            except Exception as e:
-                logging.error(f"Unable to get underlyings for {ticker}: {e}")
-                continue
-
-            symbols = [util.get_anchor_from_html(item[1]) for item in data]
-            names = [util.get_title_from_html(item[0]) for item in data]
-            weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
-
-            df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
-            df.insert(0, "ticker", ticker)
-            df["Company"] = df["Company"].apply(util.initcap)
-            df_list.append(df)
-
-    result_df = pd.concat(df_list, ignore_index=True)
-    return result_df
-
-
-def get_all_underlyings(result_dict: DictFrame) -> DictFrame:
+def get_underlyings(result_dict: DictFrame) -> DictFrame:
     """
     Extract underlying stock information for all tickers in the result_dict.
 
@@ -771,14 +727,14 @@ def get_all_underlyings(result_dict: DictFrame) -> DictFrame:
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = df["ticker"].unique()
-        underlyings = get_underlyings(tickers)
+        underlyings = get_etf_underlyings(tickers)
         underlyings_dict[key] = underlyings
     return underlyings_dict
 
 
 def create_top_holdings_page(
     result_dict: DictFrame, underlyings_dict: DictFrame
-) -> pd.DataFrame:
+) -> None:
     """
     Retrieve the top holdings based on the provided result_dict and underlyings_dict.
 
@@ -929,7 +885,7 @@ def report() -> None:
     plot_pie_charts(res_dict)
     plot_combined_pie_chart(res_dict)
     create_metrics_page(res_dict)
-    under_dict = get_all_underlyings(res_dict)
+    under_dict = get_underlyings(res_dict)
     create_top_holdings_page(res_dict, under_dict)
     create_overlaps_page(res_dict, under_dict)
     util.merge_pdfs(saved_pdf_files, output_dir + config.get("Output", "file"))

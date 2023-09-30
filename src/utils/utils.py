@@ -6,14 +6,12 @@ Date: 2023-07-02
 """
 
 import os
-import re
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pdfrw
-from bs4 import BeautifulSoup
 from matplotlib.backends.backend_pdf import PdfPages
 
 saved_pdf_files = []
@@ -116,40 +114,3 @@ def initcap(string: str) -> str:
     words = string.lower().split()
     capitalized_words = [word.capitalize() for word in words]
     return " ".join(capitalized_words)
-
-
-def get_title_from_html(item: str) -> str:
-    """
-    Get title from HTML string.
-
-    Args:
-        item: HTML string
-    Returns:
-        title
-    """
-    title_match = re.search('title="([^"]+)"', item)
-    if title_match:
-        return title_match.group(1).split("-", 1)[0]
-    else:
-        return item
-
-
-def get_anchor_from_html(item: str) -> str:
-    """
-    Get anchor tag from HTML string.
-
-    Args:
-        item: HTML string
-    Returns:
-        anchor tag
-    """
-    if len(item) <= 10:
-        return item
-    else:
-        soup = BeautifulSoup(item, "html.parser")
-        anchor_tag = soup.find("a")
-        if anchor_tag:
-            rel_attr = anchor_tag.get("rel")
-            if rel_attr:
-                return str(rel_attr[0])
-    return ""
