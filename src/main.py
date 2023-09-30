@@ -12,24 +12,23 @@ import configparser
 import json
 import logging
 import math
-import os
-import re
 import sys
 import warnings
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pdfrw
 import quantstats as qs
 import requests
 import seaborn as sns
 import yfinance as yf
-from bs4 import BeautifulSoup
 from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
+
+import utils.utils as util
+from utils.utils import saved_pdf_files
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -94,7 +93,6 @@ palette = [
     "#17becf",
 ]
 
-files = []
 output_dir = args.path + "/data/output/"
 ticker_data: DictFrame = {}
 mark_price = "Adj Close"
@@ -255,74 +253,6 @@ def calculate_all_portfolio_pnl() -> DictFrame:
     return result_dict
 
 
-def save_dataframe_to_pdf(
-    title: str,
-    df: pd.DataFrame,
-    file: str,
-    highlight_columns: Optional[List[str]] = None,
-    thresholds: Optional[List[float]] = None,
-    operators: Optional[List[str]] = None,
-    highlight_colour: Optional[str] = None,
-) -> None:
-    """
-    Save a DataFrame as a PDF file with optional highlighting of cells based on specified conditions.
-
-    Args:
-        title: Title of the PDF document.
-        df: The DataFrame to be saved as a PDF.
-        file: The path and filename of the PDF file to be created.
-        highlight_columns: List of column names to be highlighted. Defaults to None.
-        thresholds: List of threshold values for highlighting. Defaults to None.
-        operators: List of comparison operators ('>' or '<') for highlighting. Defaults to None.
-        highlight_colour: The colour for highlighting the cells. Defaults to None.
-    """
-    max_rows = 14
-    if len(df) > max_rows:
-        dfs = np.array_split(df, np.ceil(len(df) / max_rows))
-        for i, sub_df in enumerate(dfs):
-            new_file = f"{file[:-4]}_{i}.pdf"
-            save_dataframe_to_pdf(
-                title,
-                sub_df,
-                new_file,
-                highlight_columns,
-                thresholds,
-                operators,
-                highlight_colour,
-            )
-        return
-
-    fig, ax = plt.subplots(figsize=(12, 4))
-    ax.axis("tight")
-    ax.axis("off")
-    table = ax.table(cellText=df.values, colLabels=df.columns, loc="center")
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-    for (row, col), cell in table.get_celld().items():
-        if row == 0:
-            cell.set_text_props(fontweight="bold", ha="left")
-        else:
-            cell.set_text_props(ha="left")
-            if highlight_columns and thresholds and operators and highlight_colour:
-                for i, col_name in enumerate(highlight_columns):
-                    try:
-                        col_index = df.columns.get_loc(col_name)
-                    except KeyError:
-                        raise ValueError(f"Column '{col_name}' not found in dataframe")
-                    if col == col_index:
-                        cell_value = float(cell.get_text().get_text())
-                        if operators[i] == ">" and cell_value > thresholds[i]:
-                            cell.set_facecolor(highlight_colour)
-                        elif operators[i] == "<" and cell_value < thresholds[i]:
-                            cell.set_facecolor(highlight_colour)
-
-    ax.set_title(title, fontsize=12, fontweight="bold", y=0.9)
-    pp = PdfPages(output_dir + file)
-    pp.savefig(fig, bbox_inches="tight")
-    pp.close()
-    files.append(output_dir + file)
-
-
 def create_title_page(aum: str) -> None:
     """
     Create a title page for a PDF document with specified information.
@@ -345,8 +275,9 @@ def create_title_page(aum: str) -> None:
     if image != "":
         image_file = args.path + "/data/input/" + image
         pdf_output.image(image_file, x=55, y=150, w=100, h=100)
-    files.append(output_dir + "title.pdf")
-    pdf_output.output(files[-1])
+    file = output_dir + "title.pdf"
+    pdf_output.output(file)
+    saved_pdf_files.append(file)
 
 
 def get_aum(result_dict: DictFrame) -> str:
@@ -400,7 +331,7 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
     summary["Notes"] = summary["Notes"].fillna("")
 
     if save_to_file:
-        save_dataframe_to_pdf("Summary", summary, "summary.pdf")
+        util.df_to_pdf("Summary", summary, output_dir + "summary.pdf")
     else:
         print(summary)
 
@@ -459,8 +390,9 @@ def plot_performance_charts(result_dict: DictFrame, save_to_file: bool) -> None:
     fig.legend(handles, labels)
 
     if save_to_file:
-        files.append(output_dir + "performance.pdf")
-        plt.savefig(files[-1])
+        file = output_dir + "performance.pdf"
+        plt.savefig(file)
+        saved_pdf_files.append(file)
     else:
         plt.show()
 
@@ -487,7 +419,7 @@ def create_new_trades_page(result_dict: DictFrame) -> None:
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
-    save_dataframe_to_pdf("New Trades", result_df, "new_trades.pdf")
+    util.df_to_pdf("New Trades", result_df, output_dir + "new_trades.pdf")
 
 
 def create_best_and_worst_page(result_dict: DictFrame) -> None:
@@ -547,7 +479,9 @@ def create_best_and_worst_page(result_dict: DictFrame) -> None:
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
-    save_dataframe_to_pdf("Best & Worst Performers", result_df, "best_and_worst.pdf")
+    util.df_to_pdf(
+        "Best & Worst Performers", result_df, output_dir + "best_and_worst.pdf"
+    )
 
 
 def create_best_and_worst_combined_page(result_dict: DictFrame) -> None:
@@ -588,8 +522,10 @@ def create_best_and_worst_combined_page(result_dict: DictFrame) -> None:
         lambda row: str(row["Ticker"]) + " (" + str(row["Returns"]) + "%)", axis=1
     )
 
-    save_dataframe_to_pdf(
-        "Best & Worst Performers Combined", result_df, "best_and_worst_combined.pdf"
+    util.df_to_pdf(
+        "Best & Worst Performers Combined",
+        result_df,
+        output_dir + "best_and_worst_combined.pdf",
     )
 
 
@@ -634,8 +570,9 @@ def plot_pie_charts(result_dict: DictFrame) -> None:
         fig.delaxes(axs[row][col])
 
     plt.suptitle("ETF Weightings", fontsize=12, fontweight="bold")
-    files.append(output_dir + "weightings.pdf")
-    plt.savefig(files[-1])
+    file = output_dir + "weightings.pdf"
+    plt.savefig(file)
+    saved_pdf_files.append(file)
 
 
 def plot_combined_pie_chart(result_dict: DictFrame) -> None:
@@ -665,8 +602,9 @@ def plot_combined_pie_chart(result_dict: DictFrame) -> None:
     df.plot(kind="pie", autopct="%1.1f%%", colors=palette, textprops={"fontsize": 8})
     plt.title("Combined ETF Weightings", fontsize=12, fontweight="bold")
     plt.ylabel("")
-    files.append(output_dir + "combined.pdf")
-    plt.savefig(files[-1])
+    file = output_dir + "combined.pdf"
+    plt.savefig(file)
+    saved_pdf_files.append(file)
 
 
 def get_yahoo_quote_table(ticker: str) -> DictFrame:
@@ -757,69 +695,19 @@ def create_metrics_page(result_dict: DictFrame) -> None:
     operator = config.get("MetricsPage", "operator").split(",")
     highlight = config.get("MetricsPage", "highlight")
 
+    file = output_dir + "metrics.pdf"
     if len(threshold) > 1:
-        save_dataframe_to_pdf(
+        util.df_to_pdf(
             "Metrics",
             result_df,
-            "metrics.pdf",
+            file,
             fields,
             [float(s) for s in threshold],
             operator,
             highlight,
         )
     else:
-        save_dataframe_to_pdf("Metrics", result_df, "metrics.pdf")
-
-
-def initcap(string: str) -> str:
-    """
-    Convert a string to initcap format.
-
-    Args:
-        string: The input string to be converted.
-    Returns:
-        The input string converted to initcap format, where the first letter of each word is capitalized.
-    """
-    words = string.lower().split()
-    capitalized_words = [word.capitalize() for word in words]
-    return " ".join(capitalized_words)
-
-
-def get_symbol_from_html(item: str) -> str:
-    """
-    Get ticker symbol from HTML string.
-
-    Args:
-        item: HTML string
-    Returns:
-        ticker
-    """
-    if len(item) <= 10:
-        return item
-    else:
-        soup = BeautifulSoup(item, "html.parser")
-        anchor_tag = soup.find("a")
-        if anchor_tag:
-            rel_attr = anchor_tag.get("rel")
-            if rel_attr:
-                return str(rel_attr[0])
-    return ""
-
-
-def get_name_from_html(item: str) -> str:
-    """
-    Get company name from HTML string.
-
-    Args:
-        item: HTML string
-    Returns:
-        Company name
-    """
-    title_match = re.search('title="([^"]+)"', item)
-    if title_match:
-        return title_match.group(1).split("-", 1)[0]
-    else:
-        return item
+        util.df_to_pdf("Metrics", result_df, file)
 
 
 def get_underlyings(tickers: List[str]) -> pd.DataFrame:
@@ -853,13 +741,13 @@ def get_underlyings(tickers: List[str]) -> pd.DataFrame:
                 logging.error(f"Unable to get underlyings for {ticker}: {e}")
                 continue
 
-            symbols = [get_symbol_from_html(item[1]) for item in data]
-            names = [get_name_from_html(item[0]) for item in data]
+            symbols = [util.get_anchor_from_html(item[1]) for item in data]
+            names = [util.get_title_from_html(item[0]) for item in data]
             weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
 
             df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
             df.insert(0, "ticker", ticker)
-            df["Company"] = df["Company"].apply(initcap)
+            df["Company"] = df["Company"].apply(util.initcap)
             df_list.append(df)
 
     result_df = pd.concat(df_list, ignore_index=True)
@@ -940,18 +828,19 @@ def create_top_holdings_page(
 
     threshold = config.get("HoldingsPage", "threshold")
 
+    file = output_dir + "holdings.pdf"
     if len(threshold) > 0:
-        save_dataframe_to_pdf(
+        util.df_to_pdf(
             "Top Holdings",
             result_df,
-            "holdings.pdf",
+            file,
             ["Weight"],
             [float(threshold)],
             [">"],
             "red",
         )
     else:
-        save_dataframe_to_pdf("Top Holdings", result_df, "holdings.pdf")
+        util.df_to_pdf("Top Holdings", result_df, file)
 
 
 def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) -> None:
@@ -995,28 +884,11 @@ def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) ->
         )
         sns_plot.figure.set_size_inches(10, 7)
         sns_plot.set_title("ETF Overlaps - " + key, fontsize=12, fontweight="bold")
-        files.append(output_dir + "heatmap_" + key + ".pdf")
-        pp = PdfPages(files[-1])
+        file = output_dir + "heatmap_" + key + ".pdf"
+        pp = PdfPages(file)
         pp.savefig(sns_plot.figure)
         pp.close()
-
-
-def merge_pdfs(input_files: List[str], output_file: str) -> None:
-    """
-    Merge multiple PDF files into a single PDF file.
-
-    Args:
-        input_files: A list of input file paths (strings) representing the PDF files to be merged.
-        output_file: The output file path (string) where the merged PDF file will be saved.
-    """
-    logging.info("Merging files")
-    pdf_output = pdfrw.PdfWriter()
-    for file_name in input_files:
-        pdf_input = pdfrw.PdfReader(file_name)
-        for page in pdf_input.pages:
-            pdf_output.addpage(page)
-        os.remove(file_name)
-    pdf_output.write(output_file)
+        saved_pdf_files.append(file)
 
 
 def summary() -> None:
@@ -1060,7 +932,8 @@ def report() -> None:
     under_dict = get_all_underlyings(res_dict)
     create_top_holdings_page(res_dict, under_dict)
     create_overlaps_page(res_dict, under_dict)
-    merge_pdfs(files, output_dir + config.get("Output", "file"))
+    util.merge_pdfs(saved_pdf_files, output_dir + config.get("Output", "file"))
+    logging.info("Complete")
 
 
 if __name__ == "__main__":
