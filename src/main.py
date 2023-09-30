@@ -20,14 +20,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import quantstats as qs
-import requests
 import seaborn as sns
 import yfinance as yf
 from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
 import utils.utils as util
-from utils.data import get_etf_underlyings
+from utils.data import get_etf_underlyings, get_yahoo_quote_table
 from utils.utils import saved_pdf_files
 
 parser = argparse.ArgumentParser()
@@ -605,31 +604,6 @@ def plot_combined_pie_chart(result_dict: DictFrame) -> None:
     file = output_dir + "combined.pdf"
     plt.savefig(file)
     saved_pdf_files.append(file)
-
-
-def get_yahoo_quote_table(ticker: str) -> DictFrame:
-    """
-    Scrapes data elements from Yahoo Finance's quote page for a given ticker.
-
-    Args:
-        ticker: Ticker symbol of the desired ETF.
-    Returns:
-        Dictionary containing scraped data elements with attribute-value pairs.
-    """
-    url = "https://finance.yahoo.com/quote/" + ticker + "?p=" + ticker
-    try:
-        tables = pd.read_html(
-            requests.get(url, headers={"User-agent": "Mozilla/5.0"}).text
-        )
-    except Exception as e:
-        logging.fatal(f"Unable to get metrics from Yahoo finance for {ticker}: {e}")
-        sys.exit()
-    data = pd.concat([tables[0], tables[1]])
-    data.columns = ["attribute", "value"]
-    data = data.sort_values("attribute")
-    data = data.drop_duplicates().reset_index(drop=True)
-    result = {key: val for key, val in zip(data.attribute, data.value)}
-    return result
 
 
 def calculate_sharpe_ratio(ticker: str) -> float:

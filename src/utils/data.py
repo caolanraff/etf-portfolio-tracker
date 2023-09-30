@@ -7,7 +7,7 @@ Date: 2023-07-02
 
 import json
 import re
-from typing import List
+from typing import Dict, List
 
 import pandas as pd
 import requests
@@ -95,3 +95,27 @@ def get_etf_underlyings(tickers: List[str]) -> pd.DataFrame:
 
     result_df = pd.concat(df_list, ignore_index=True)
     return result_df
+
+
+def get_yahoo_quote_table(ticker: str) -> Dict[str, pd.DataFrame]:
+    """
+    Scrapes data elements from Yahoo Finance's quote page for a given ticker.
+
+    Args:
+        ticker: Ticker symbol of the desired ETF.
+    Returns:
+        Dictionary containing scraped data elements with attribute-value pairs.
+    """
+    url = "https://finance.yahoo.com/quote/" + ticker + "?p=" + ticker
+    try:
+        tables = pd.read_html(
+            requests.get(url, headers={"User-agent": "Mozilla/5.0"}).text
+        )
+    except Exception as e:
+        print(f"Unable to get metrics from Yahoo finance for {ticker}: {e}")
+    data = pd.concat([tables[0], tables[1]])
+    data.columns = ["attribute", "value"]
+    data = data.sort_values("attribute")
+    data = data.drop_duplicates().reset_index(drop=True)
+    result = {key: val for key, val in zip(data.attribute, data.value)}
+    return result
