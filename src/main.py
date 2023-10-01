@@ -11,7 +11,6 @@ import argparse
 import configparser
 import logging
 import math
-import sys
 import warnings
 from datetime import datetime, timedelta
 from typing import Dict
@@ -21,13 +20,17 @@ import numpy as np
 import pandas as pd
 import quantstats as qs
 import seaborn as sns
-import yfinance as yf
 from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
-import utils.utils as util
-from utils.data import get_etf_underlyings, get_yahoo_quote_table
-from utils.utils import saved_pdf_files
+import utils.util as util
+from utils.data import (
+    get_etf_underlyings,
+    get_ticker_data,
+    get_yahoo_quote_table,
+    ticker_data,
+)
+from utils.util import saved_pdf_files
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -93,31 +96,7 @@ palette = [
 ]
 
 output_dir = args.path + "/data/output/"
-ticker_data: DictFrame = {}
 mark_price = "Adj Close"
-
-
-def get_ticker_data(ticker: str) -> pd.DataFrame:
-    """
-    Retrieve historical data for a given ticker symbol.
-
-    Args:
-        ticker: Ticker symbol for the desired ETF.
-    Returns:
-        DataFrame containing the historical data for the specified ticker.
-    """
-    if ticker in ticker_data.keys():
-        return ticker_data[ticker]
-    try:
-        data = yf.download(ticker, progress=False)
-    except Exception as e:
-        logging.fatal(f"Unable to get data from Yahoo finance for {ticker}: {e}")
-        sys.exit()
-    data.index = pd.to_datetime(data.index).date
-    data = data.reindex(pd.date_range(min(list(data.index)), end_date, freq="D"))
-    data = data.fillna(method="ffill")
-    ticker_data[ticker] = data
-    return data
 
 
 def calculate_portfolio_pnl(file_path: str, sheet: str) -> pd.DataFrame:

@@ -7,13 +7,41 @@ Date: 2023-07-02
 
 import json
 import re
+import sys
+from datetime import date
 from typing import Dict, List
 
 import pandas as pd
 import requests
+import yfinance as yf
 from bs4 import BeautifulSoup
 
-from utils.utils import initcap
+from utils.util import initcap
+
+ticker_data: Dict[str, pd.DataFrame] = {}
+
+
+def get_ticker_data(ticker: str) -> pd.DataFrame:
+    """
+    Retrieve historical data for a given ticker symbol.
+
+    Args:
+        ticker: Ticker symbol for the desired ETF.
+    Returns:
+        DataFrame containing the historical data for the specified ticker.
+    """
+    if ticker in ticker_data.keys():
+        return ticker_data[ticker]
+    try:
+        data = yf.download(ticker, progress=False)
+    except Exception as e:
+        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
+        sys.exit()
+    data.index = pd.to_datetime(data.index).date
+    data = data.reindex(pd.date_range(min(list(data.index)), date.today(), freq="D"))
+    data = data.fillna(method="ffill")
+    ticker_data[ticker] = data
+    return data
 
 
 def get_title_from_html(item: str) -> str:
