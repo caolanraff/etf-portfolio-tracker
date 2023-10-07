@@ -16,8 +16,6 @@ import requests
 import yfinance as yf
 from bs4 import BeautifulSoup
 
-from utils.util import initcap
-
 ticker_data: Dict[str, pd.DataFrame] = {}
 
 
@@ -118,7 +116,7 @@ def get_etf_underlyings(tickers: List[str]) -> pd.DataFrame:
 
             df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
             df.insert(0, "ticker", ticker)
-            df["Company"] = df["Company"].apply(initcap)
+            df["Company"] = df["Company"].str.title()
             df_list.append(df)
 
     result_df = pd.concat(df_list, ignore_index=True)

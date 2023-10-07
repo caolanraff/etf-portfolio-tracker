@@ -100,17 +100,3 @@ def merge_pdfs(input_files: List[str], output_file: str) -> None:
             pdf_output.addpage(page)
         os.remove(file_name)
     pdf_output.write(output_file)
-
-
-def initcap(string: str) -> str:
-    """
-    Convert a string to initcap format.
-
-    Args:
-        string: The input string to be converted.
-    Returns:
-        The input string converted to initcap format, where the first letter of each word is capitalized.
-    """
-    words = string.lower().split()
-    capitalized_words = [word.capitalize() for word in words]
-    return " ".join(capitalized_words)
