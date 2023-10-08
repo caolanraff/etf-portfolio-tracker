@@ -13,7 +13,7 @@ import logging
 import math
 import warnings
 from datetime import datetime, timedelta
-from typing import Dict
+from typing import Any, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,52 +32,12 @@ from utils.data import (
 )
 from utils.util import saved_pdf_files
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--timeframe", default="MTD", type=str, help="timeframe [MTD|YTD|adhoc]"
-)
-parser.add_argument("--start", default="", type=str, help="start date")
-parser.add_argument("--end", default="", type=str, help="end date")
-parser.add_argument("--report", action="store_true", help="generate PDF report")
-parser.add_argument("--path", default="./", type=str, help="directory path")
-parser.add_argument(
-    "--config", default="config/default.ini", type=str, help="config file"
-)
-args = parser.parse_args()
-
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
+# Variable definitions
 DictFrame = Dict[str, pd.DataFrame]
+mark_price = "Adj Close"
 
-timeframe = args.timeframe
-start_date = args.start
-end_date = args.end
-now = datetime.now()
-if start_date == "":
-    if timeframe == "MTD":
-        start_date = datetime(now.year, now.month, 1)
-    elif timeframe == "YTD":
-        start_date = datetime(now.year, 1, 1)
-    else:
-        logging.error("Unknown timeframe")
-        exit()
-else:
-    start_date = datetime.strptime(start_date, "%Y-%m-%d")
-
-start_date = start_date + timedelta(days=-1)
-
-if end_date == "":
-    end_date = datetime(now.year, now.month, now.day)
-else:
-    end_date = datetime.strptime(end_date, "%Y-%m-%d")
-
-config = configparser.ConfigParser()
-config.read(args.path + "/" + args.config)
-
+# Session settings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 pd.set_option("display.width", None)
@@ -95,8 +55,44 @@ palette = [
     "#17becf",
 ]
 
-output_dir = args.path + "/data/output/"
-mark_price = "Adj Close"
+
+def parse_arguments() -> Any:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--timeframe", default="MTD", type=str, help="timeframe [MTD|YTD|adhoc]"
+    )
+    parser.add_argument("--start", default=None, type=str, help="start date")
+    parser.add_argument("--end", default=None, type=str, help="end date")
+    parser.add_argument("--report", action="store_true", help="generate PDF report")
+    parser.add_argument("--path", default="./", type=str, help="directory path")
+    parser.add_argument(
+        "--config", default="config/default.ini", type=str, help="config file"
+    )
+    args = parser.parse_args()
+
+    now = datetime.now()
+    timeframe_mapping = {
+        "MTD": datetime(now.year, now.month, 1),
+        "YTD": datetime(now.year, 1, 1),
+    }
+
+    start_date = (
+        datetime.strptime(args.start, "%Y-%m-%d")
+        if args.start
+        else timeframe_mapping.get(args.timeframe)
+    )
+    if start_date is None:
+        raise ValueError("Unknown timeframe: {}".format(args.timeframe))
+    args.start_date = start_date + timedelta(days=-1)
+
+    args.end_date = (
+        datetime.strptime(args.end, "%Y-%m-%d")
+        if args.end
+        else datetime(now.year, now.month, now.day)
+    )
+
+    return args
 
 
 def calculate_portfolio_pnl(file_path: str, sheet: str) -> pd.DataFrame:
@@ -238,6 +234,7 @@ def create_title_page(aum: str) -> None:
     Args:
         aum: Assets Under Management (AUM) value to be displayed on the title page.
     """
+    logging.info("Creating title page")
     pdf_output = FPDF()
     pdf_output.add_page()
     title = config.get("TitlePage", "title")
@@ -286,7 +283,7 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
         result_dict: A dictionary containing portfolio data as DataFrame objects.
         save_to_file: Flag indicating whether to save the summary as a PDF file or print it.
     """
-    logging.info("Get summary info")
+    logging.info("Get summary information")
     val = []
 
     for key, df in result_dict.items():
@@ -300,9 +297,9 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
         ) * 100
         val.append(pnl)
 
-    summary = pd.DataFrame({"Portfolio": list(result_dict.keys()), timeframe: val})
-    summary = summary.sort_values(by=timeframe, ascending=False)
-    summary[timeframe] = summary[timeframe].round(3)
+    summary = pd.DataFrame({"Portfolio": list(result_dict.keys()), args.timeframe: val})
+    summary = summary.sort_values(by=args.timeframe, ascending=False)
+    summary[args.timeframe] = summary[args.timeframe].round(3)
     summary = summary.reset_index(drop=True)
     summary.loc[0, "Notes"] = config.get("SummaryPage", "best")
     summary.loc[summary.index[-1], "Notes"] = config.get("SummaryPage", "worst")
@@ -360,7 +357,7 @@ def plot_performance_charts(result_dict: DictFrame, save_to_file: bool) -> None:
             labels.append(name)
         ax2.set_xlabel("Date")
         ax2.set_ylabel("PnL")
-        ax2.set_title(timeframe + " PnL Change", fontsize=12, fontweight="bold")
+        ax2.set_title(args.timeframe + " PnL Change", fontsize=12, fontweight="bold")
         ax2.set_xlim(start_date, end_date)
 
     for ax in (ax1, ax2):
@@ -469,6 +466,7 @@ def create_best_and_worst_combined_page(result_dict: DictFrame) -> None:
     Args:
         result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
+    logging.info("Getting combined best and worst ETFs")
     returns = pd.DataFrame(columns=["Ticker", "Returns"])
     result_df = pd.DataFrame()
     tickers = []
@@ -807,7 +805,7 @@ def summary() -> None:
     generates a summary, and plots performance charts.
     """
     logging.info(
-        f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
+        f"Running report for {args.timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
     )
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
@@ -825,7 +823,7 @@ def report() -> None:
     extraction of underlyings information, top holdings retrieval, ETF overlap analysis, and merging of PDF files.
     """
     logging.info(
-        f"Running report for {timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
+        f"Running report for {args.timeframe} ({start_date:%Y-%m-%d} - {end_date:%Y-%m-%d})"
     )
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
@@ -846,7 +844,13 @@ def report() -> None:
 
 
 if __name__ == "__main__":
-    if args.report:
-        report()
-    else:
-        summary()
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+    )
+    args = parse_arguments()
+    start_date = args.start_date
+    end_date = args.end_date
+    output_dir = args.path + "/data/output/"
+    config = configparser.ConfigParser()
+    config.read(args.path + "/" + args.config)
+    report() if args.report else summary()
