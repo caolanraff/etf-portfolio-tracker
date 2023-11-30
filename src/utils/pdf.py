@@ -13,6 +13,9 @@ import numpy as np
 import pandas as pd
 import pdfrw
 from matplotlib.backends.backend_pdf import PdfPages
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate
 
 saved_pdf_files = []
 
@@ -100,3 +103,40 @@ def merge_pdfs(input_files: List[str], output_file: str) -> None:
             pdf_output.addpage(page)
         os.remove(file_name)
     pdf_output.write(output_file)
+
+
+def save_paragraphs_to_pdf(
+    title: str, headings: List[str], paragraphs: List[str], output_file: str
+) -> None:
+    """
+    Save paragraphs to a PDF file with specified title, headings, and output file.
+
+    Args:
+        title: The main title of the document.
+        headings: A list of heading strings.
+        paragraphs: A list of paragraph strings.
+        output_file: The path to the output PDF file.
+    """
+    doc = SimpleDocTemplate(output_file, pagesize=letter)
+    styles = getSampleStyleSheet()
+    main_title_style = ParagraphStyle(
+        name="MainTitle", parent=styles["Heading1"], alignment=1, spaceAfter=24
+    )
+
+    title_style = styles["Heading3"]
+    title_style.alignment = 0
+    paragraph_style = styles["Normal"]
+    paragraph_style.fontSize = 10
+    paragraph_style.spaceAfter = 12
+    elements = []
+    main_title_element = Paragraph(title, main_title_style)
+    elements.append(main_title_element)
+
+    for title, paragraph in zip(headings, paragraphs):
+        title_element = Paragraph(title, title_style)
+        elements.append(title_element)
+        paragraph_element = Paragraph(paragraph, paragraph_style)
+        elements.append(paragraph_element)
+
+    doc.build(elements)
+    saved_pdf_files.append(output_file)

@@ -20,17 +20,18 @@ import numpy as np
 import pandas as pd
 import quantstats as qs
 import seaborn as sns
+import yfinance as yf
 from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
-import utils.util as util
+import utils.pdf as pdf
 from utils.data import (
     get_etf_underlyings,
     get_ticker_data,
     get_yahoo_quote_table,
     ticker_data,
 )
-from utils.util import saved_pdf_files
+from utils.pdf import saved_pdf_files
 
 # Variable definitions
 DictFrame = Dict[str, pd.DataFrame]
@@ -264,7 +265,7 @@ def get_aum(result_dict: DictFrame) -> str:
     Returns:
         The AUM value formatted as a string.
     """
-    logging.info("Get AUM")
+    logging.info("Getting AUM")
     portfolio_val = 0
 
     for name, df in result_dict.items():
@@ -283,7 +284,7 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
         result_dict: A dictionary containing portfolio data as DataFrame objects.
         save_to_file: Flag indicating whether to save the summary as a PDF file or print it.
     """
-    logging.info("Get summary information")
+    logging.info("Getting summary information")
     val = []
 
     for key, df in result_dict.items():
@@ -306,7 +307,7 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
     summary["Notes"] = summary["Notes"].fillna("")
 
     if save_to_file:
-        util.df_to_pdf("Summary", summary, output_dir + "summary.pdf")
+        pdf.df_to_pdf("Summary", summary, output_dir + "summary.pdf")
     else:
         print(summary)
 
@@ -394,7 +395,7 @@ def create_new_trades_page(result_dict: DictFrame) -> None:
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
-    util.df_to_pdf("New Trades", result_df, output_dir + "new_trades.pdf")
+    pdf.df_to_pdf("New Trades", result_df, output_dir + "new_trades.pdf")
 
 
 def create_best_and_worst_page(result_dict: DictFrame) -> None:
@@ -408,8 +409,7 @@ def create_best_and_worst_page(result_dict: DictFrame) -> None:
     result_df = pd.DataFrame()
 
     for key, df in result_dict.items():
-        start = max(min(df["date"]).to_pydatetime(), start_date)
-        first_day = df.loc[df["date"] == start]
+        first_day = df.groupby("ticker").first()
         last_day = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         merged_df = pd.merge(
             first_day, last_day, on="ticker", suffixes=("_start", "_end")
@@ -443,7 +443,7 @@ def create_best_and_worst_page(result_dict: DictFrame) -> None:
         min_pnl_pct = round(merged_df["pnl_pct"].min(), 2)
         worst_pnl_pct = f"{worst_pnl_pct} ({min_pnl_pct}%)"
 
-        df = pd.DataFrame(
+        summary = pd.DataFrame(
             {
                 "Portfolio": [key],
                 "Best Price Pct": [best_price_pct],
@@ -452,9 +452,10 @@ def create_best_and_worst_page(result_dict: DictFrame) -> None:
                 "Worst PnL Pct": [worst_pnl_pct],
             }
         )
-        result_df = pd.concat([result_df, df], ignore_index=True)
 
-    util.df_to_pdf(
+        result_df = pd.concat([result_df, summary], ignore_index=True)
+
+    pdf.df_to_pdf(
         "Best & Worst Performers", result_df, output_dir + "best_and_worst.pdf"
     )
 
@@ -498,7 +499,7 @@ def create_best_and_worst_combined_page(result_dict: DictFrame) -> None:
         lambda row: str(row["Ticker"]) + " (" + str(row["Returns"]) + "%)", axis=1
     )
 
-    util.df_to_pdf(
+    pdf.df_to_pdf(
         "Best & Worst Performers Combined",
         result_df,
         output_dir + "best_and_worst_combined.pdf",
@@ -648,7 +649,7 @@ def create_metrics_page(result_dict: DictFrame) -> None:
 
     file = output_dir + "metrics.pdf"
     if len(threshold) > 1:
-        util.df_to_pdf(
+        pdf.df_to_pdf(
             "Metrics",
             result_df,
             file,
@@ -658,7 +659,7 @@ def create_metrics_page(result_dict: DictFrame) -> None:
             highlight,
         )
     else:
-        util.df_to_pdf("Metrics", result_df, file)
+        pdf.df_to_pdf("Metrics", result_df, file)
 
 
 def get_underlyings(result_dict: DictFrame) -> DictFrame:
@@ -737,7 +738,7 @@ def create_top_holdings_page(
 
     file = output_dir + "holdings.pdf"
     if len(threshold) > 0:
-        util.df_to_pdf(
+        pdf.df_to_pdf(
             "Top Holdings",
             result_df,
             file,
@@ -747,7 +748,7 @@ def create_top_holdings_page(
             "red",
         )
     else:
-        util.df_to_pdf("Top Holdings", result_df, file)
+        pdf.df_to_pdf("Top Holdings", result_df, file)
 
 
 def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) -> None:
@@ -798,6 +799,29 @@ def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) ->
         saved_pdf_files.append(file)
 
 
+def create_descriptions_page() -> None:
+    """
+    Create ETF descriptions page.
+
+    Note: This API is currently down.
+    """
+    logging.info("Creating description page")
+
+    tickers = sorted(ticker_data.keys())
+    headers = []
+    paragraphs = []
+
+    for i in tickers:
+        data = yf.Ticker(i).info
+        if "longBusinessSummary" in data:
+            headers += [f"{data['shortName']} ({i})"]
+            paragraphs += [data["longBusinessSummary"]]
+
+    pdf.save_paragraphs_to_pdf(
+        "ETF Descriptions", headers, paragraphs, output_dir + "descriptions.pdf"
+    )
+
+
 def summary() -> None:
     """Run a summary report, printing the outputs.
 
@@ -839,7 +863,7 @@ def report() -> None:
     under_dict = get_underlyings(res_dict)
     create_top_holdings_page(res_dict, under_dict)
     create_overlaps_page(res_dict, under_dict)
-    util.merge_pdfs(saved_pdf_files, output_dir + config.get("Output", "file"))
+    pdf.merge_pdfs(saved_pdf_files, output_dir + config.get("Output", "file"))
     logging.info("Complete")
 
 
