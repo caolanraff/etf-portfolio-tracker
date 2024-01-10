@@ -26,20 +26,24 @@ This will create a PDF report (sample below) with the following pages:
 - Highest weighted underlyings
 - ETF percentage overlaps
 
+There is also an option to add a benchmark ticker to compare portfolios against.
+It will assume a purchase of 1 share at the end of every month.
+
 ### Samples
 Sample input file: [portfolios.xlsx](data/input/portfolios.xlsx)
 
 Sample output file: [advanced_report.pdf](data/output/advanced_report.pdf)
 
 ### Getting started
-Clone the project and run:
+Clone the project and install poetry:
 ```
-pip install -r requirements.txt
+$ brew install poetry
+$ poetry install
 ```
 
 ### Usage
 ```
-$ python src/main.py --help
+$ poetry run python src/main.py --help
 usage: main.py [-h] [--timeframe TIMEFRAME] [--start START] [--end END] [--config CONFIG] [--report]
 
 optional arguments:
@@ -53,11 +57,11 @@ optional arguments:
 
 ##### Examples
 ```
-python src/main.py --timeframe YTD
+poetry run python src/main.py --timeframe YTD
 
-python src/main.py --timeframe MTD --start 2023-05-01 --end 2023-05-30
+poetry run python src/main.py --timeframe MTD --start 2023-05-01 --end 2023-05-30
 
-python src/main.py --timeframe MTD --config config/advanced.ini --report
+poetry run python src/main.py --timeframe MTD --config config/advanced.ini --report
 ```
 
 ### Configuration
@@ -66,18 +70,21 @@ Multiple configs can be created and be passed in on an adhoc basis to create dif
 The config settings are:
 - Input
   - file --> excel file with the trades for each portfolio across different tabs
-  - image --> image to be displayed on the title page
-- Text
+  - benchmark --> benchmark ticker to compare portfolios against
+- TitlePage
   - title --> title on the title page
+  - image --> image to be displayed on the title page
+- SummaryPage
   - best --> comments to be made about the best portfolio
   - worst --> comments to be made about the worst portfolio
-- Weightings
+- WeightingsPage
   - other --> for the combined weights, if ETF weighting is below this value it will be moved into 'other' section
-- Metrics
+- MetricsPage
   - threshold --> list of thresholds for the outlined metrics
   - operator --> the operator to check against (.e.g >, <, =)
   - highlight --> colour of highlighting
-- Holdings
-  - top --> the number of companies to include in the top underlyings
+- HoldingsPage
+  - num_of_companies --> the number of companies to include in the top underlyings
+  - threshold --> threshold for maximum % of holding in single company
 - Output
   - file --> the name of the output file

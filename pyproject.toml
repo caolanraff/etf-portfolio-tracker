@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "etf-portfolio-tracker"
+version = "0.1.0"
+description = "ETF Portfolio Tracker"
+authors = ["Caolan Rafferty <caolanraff@hotmail.co.uk>"]
+license = "MIT License"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+matplotlib = "^3.8.2"
+pandas = "^2.1.4"
+quantstats = "^0.0.62"
+ipython = "^8.19.0"
+fpdf = "^1.7.2"
+pdfrw = "^0.4"
+reportlab = "^4.0.8"
+openpyxl = "^3.1.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

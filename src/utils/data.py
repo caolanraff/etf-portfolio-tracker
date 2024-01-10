@@ -9,6 +9,7 @@ import json
 import re
 import sys
 from datetime import date
+from io import StringIO
 from typing import Dict, List
 
 import pandas as pd
@@ -134,9 +135,8 @@ def get_yahoo_quote_table(ticker: str) -> Dict[str, pd.DataFrame]:
     """
     url = "https://finance.yahoo.com/quote/" + ticker + "?p=" + ticker
     try:
-        tables = pd.read_html(
-            requests.get(url, headers={"User-agent": "Mozilla/5.0"}).text
-        )
+        response = requests.get(url, headers={"User-agent": "Mozilla/5.0"})
+        tables = pd.read_html(StringIO(response.text))
     except Exception as e:
         print(f"Unable to get metrics from Yahoo finance for {ticker}: {e}")
     data = pd.concat([tables[0], tables[1]])

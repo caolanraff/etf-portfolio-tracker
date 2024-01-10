@@ -20,7 +20,6 @@ import numpy as np
 import pandas as pd
 import quantstats as qs
 import seaborn as sns
-import yfinance as yf
 from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -35,14 +34,11 @@ from utils.pdf import saved_pdf_files
 
 # Variable definitions
 DictFrame = Dict[str, pd.DataFrame]
-mark_price = "Adj Close"
+MARK_PRICE = "Adj Close"
 
-# Session settings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-pd.set_option("display.max_columns", None)
-pd.set_option("display.max_rows", None)
-pd.set_option("display.width", None)
-plt.style.use("seaborn")
+# Settings
+warnings.filterwarnings("ignore", category=FutureWarning)
+plt.style.use("seaborn-v0_8")
 palette = [
     "#1f77b4",
     "#ff7f0e",
@@ -96,21 +92,15 @@ def parse_arguments() -> Any:
     return args
 
 
-def calculate_portfolio_pnl(file_path: str, sheet: str) -> pd.DataFrame:
+def calculate_portfolio_pnl(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate the profit and loss (PnL) for a specific portfolio.
 
     Args:
-        file_path: The path to the Excel file containing the portfolio data.
-        sheet: The name of the sheet within the Excel file containing the portfolio data.
+        df: A dataframe of the portfolio executions data.
     Returns:
         A DataFrame containing the calculated PnL for the portfolio.
     """
-    df = pd.read_excel(file_path, sheet_name=sheet)
-    if len(df) == 0:
-        logging.warning("Tab is empty for " + sheet)
-        return
-
     df["date"] = pd.to_datetime(df["date"])
     # Aggregate the trades by date, ticker
     df = (
@@ -124,6 +114,7 @@ def calculate_portfolio_pnl(file_path: str, sheet: str) -> pd.DataFrame:
         .reset_index()
     )
     max_date = pd.Timestamp(end_date)
+    df = df[df["date"] < max_date]
     grouped = df.groupby("ticker")
     result_df = pd.DataFrame()
 
@@ -158,7 +149,7 @@ def calculate_portfolio_pnl(file_path: str, sheet: str) -> pd.DataFrame:
     prices = {}
     for ticker in result_df["ticker"].unique():
         data = get_ticker_data(ticker)
-        data = data.loc[min_date:max_date][mark_price]
+        data = data.loc[min_date:max_date][MARK_PRICE]
         prices[ticker] = data
 
     # Merge the price data onto the original dataframe
@@ -217,14 +208,29 @@ def calculate_all_portfolio_pnl() -> DictFrame:
     file = args.path + "/data/input/" + config.get("Input", "file")
     sheets = pd.ExcelFile(file).sheet_names
     for sheet in sheets:
-        res = calculate_portfolio_pnl(file, sheet)
-        if res is None:
+        data = pd.read_excel(file, sheet_name=sheet)
+        if len(data) == 0:
+            logging.warning("Tab is empty for " + sheet)
             continue
+        res = calculate_portfolio_pnl(data)
         res = res[(res["date"] >= start_date) & (res["date"] <= end_date)]
         group = res.groupby("ticker")["cumulative_quantity"].sum()
         tickers = group[group == 0].index
         res = res[~res["ticker"].isin(tickers)]
         result_dict[sheet] = res
+
+    # add benchmark portfolio
+    bticker = config.get("Input", "benchmark")
+    if bticker != "":
+        data = get_ticker_data(bticker)
+        data = data.loc[start_date:end_date][MARK_PRICE]
+        benchmark = pd.DataFrame(
+            {"date": data.index, "ticker": len(data) * [bticker], "price": data.values}
+        )
+        benchmark = benchmark[benchmark["date"].dt.is_month_end]
+        benchmark["quantity"] = 1.0
+        result_dict["Benchmark"] = calculate_portfolio_pnl(benchmark)
+
     return result_dict
 
 
@@ -269,6 +275,8 @@ def get_aum(result_dict: DictFrame) -> str:
     portfolio_val = 0
 
     for name, df in result_dict.items():
+        if name == "Benchmark":
+            continue
         res = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)].iloc[0]
         portfolio_val += res["portfolio_value"]
 
@@ -302,9 +310,9 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
     summary = summary.sort_values(by=args.timeframe, ascending=False)
     summary[args.timeframe] = summary[args.timeframe].round(3)
     summary = summary.reset_index(drop=True)
+    summary["Notes"] = ""
     summary.loc[0, "Notes"] = config.get("SummaryPage", "best")
     summary.loc[summary.index[-1], "Notes"] = config.get("SummaryPage", "worst")
-    summary["Notes"] = summary["Notes"].fillna("")
 
     if save_to_file:
         pdf.df_to_pdf("Summary", summary, output_dir + "summary.pdf")
@@ -474,8 +482,8 @@ def create_best_and_worst_combined_page(result_dict: DictFrame) -> None:
 
     for key, df in ticker_data.items():
         df = df.loc[start_date:end_date]
-        first_close = df[mark_price].iloc[0]
-        last_close = df[mark_price].iloc[-1]
+        first_close = df[MARK_PRICE].iloc[0]
+        last_close = df[MARK_PRICE].iloc[-1]
         percentage_change = (last_close - first_close) / first_close * 100
         df = pd.DataFrame({"Ticker": [key], "Returns": [round(percentage_change, 2)]})
         returns = pd.concat([returns, df], ignore_index=True)
@@ -596,7 +604,7 @@ def calculate_sharpe_ratio(ticker: str) -> float:
     data = get_ticker_data(ticker)
     min_date = end_date - timedelta(days=5 * 365)
     data = data.loc[min_date:end_date]
-    returns = data[mark_price].pct_change()
+    returns = data[MARK_PRICE].pct_change()
     sharpe = qs.stats.sharpe(returns).round(2)
     return float(sharpe)
 
@@ -799,29 +807,6 @@ def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) ->
         saved_pdf_files.append(file)
 
 
-def create_descriptions_page() -> None:
-    """
-    Create ETF descriptions page.
-
-    Note: This API is currently down.
-    """
-    logging.info("Creating description page")
-
-    tickers = sorted(ticker_data.keys())
-    headers = []
-    paragraphs = []
-
-    for i in tickers:
-        data = yf.Ticker(i).info
-        if "longBusinessSummary" in data:
-            headers += [f"{data['shortName']} ({i})"]
-            paragraphs += [data["longBusinessSummary"]]
-
-    pdf.save_paragraphs_to_pdf(
-        "ETF Descriptions", headers, paragraphs, output_dir + "descriptions.pdf"
-    )
-
-
 def summary() -> None:
     """Run a summary report, printing the outputs.
 
@@ -854,6 +839,7 @@ def report() -> None:
     create_title_page(aum)
     get_summary(res_dict, True)
     plot_performance_charts(res_dict, True)
+    res_dict.pop("Benchmark", None)
     create_new_trades_page(res_dict)
     create_best_and_worst_page(res_dict)
     create_best_and_worst_combined_page(res_dict)
