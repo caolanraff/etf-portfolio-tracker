@@ -25,6 +25,7 @@ This will create a PDF report (sample below) with the following pages:
   - With optional highlighing for high/low values
 - Highest weighted underlyings
 - ETF percentage overlaps
+- ETF Descriptions
 
 There is also an option to add a benchmark ticker to compare portfolios against.
 It will assume a purchase of 1 share at the end of every month.

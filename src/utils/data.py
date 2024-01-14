@@ -18,6 +18,7 @@ import yfinance as yf
 from bs4 import BeautifulSoup
 
 ticker_data: Dict[str, pd.DataFrame] = {}
+ticker_info: Dict[str, pd.DataFrame] = {}
 
 
 def get_ticker_data(ticker: str) -> pd.DataFrame:
@@ -145,3 +146,23 @@ def get_yahoo_quote_table(ticker: str) -> Dict[str, pd.DataFrame]:
     data = data.drop_duplicates().reset_index(drop=True)
     result = {key: val for key, val in zip(data.attribute, data.value)}
     return result
+
+
+def get_ticker_info(ticker: str) -> pd.DataFrame:
+    """
+    Retrieve info data for a given ticker symbol.
+
+    Args:
+        ticker: Ticker symbol for the desired ETF.
+    Returns:
+        DataFrame containing the data info for the specified ticker.
+    """
+    if ticker in ticker_info.keys():
+        return ticker_info[ticker]
+    try:
+        data = yf.Ticker(ticker).info
+    except Exception as e:
+        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
+        sys.exit()
+    ticker_info[ticker] = data
+    return data

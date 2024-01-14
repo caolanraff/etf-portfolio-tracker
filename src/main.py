@@ -27,6 +27,7 @@ import utils.pdf as pdf
 from utils.data import (
     get_etf_underlyings,
     get_ticker_data,
+    get_ticker_info,
     get_yahoo_quote_table,
     ticker_data,
 )
@@ -807,6 +808,25 @@ def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) ->
         saved_pdf_files.append(file)
 
 
+def create_descriptions_page() -> None:
+    """Create ETF descriptions page."""
+    logging.info("Creating description page")
+
+    tickers = sorted(ticker_data.keys())
+    headers = []
+    paragraphs = []
+
+    for i in tickers:
+        data = get_ticker_info(i)
+        if "longBusinessSummary" in data:
+            headers += [f"{data['shortName']} ({i})"]
+            paragraphs += [data["longBusinessSummary"]]
+
+    pdf.save_paragraphs_to_pdf(
+        "ETF Descriptions", headers, paragraphs, output_dir + "descriptions.pdf"
+    )
+
+
 def summary() -> None:
     """Run a summary report, printing the outputs.
 
@@ -849,6 +869,7 @@ def report() -> None:
     under_dict = get_underlyings(res_dict)
     create_top_holdings_page(res_dict, under_dict)
     create_overlaps_page(res_dict, under_dict)
+    create_descriptions_page()
     pdf.merge_pdfs(saved_pdf_files, output_dir + config.get("Output", "file"))
     logging.info("Complete")
 

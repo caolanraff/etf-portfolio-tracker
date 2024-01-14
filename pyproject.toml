@@ -3,7 +3,7 @@ name = "etf-portfolio-tracker"
 version = "0.1.0"
 description = "ETF Portfolio Tracker"
 authors = ["Caolan Rafferty <caolanraff@hotmail.co.uk>"]
-license = "MIT License"
+license = "LICENSE.txt"
 readme = "README.md"
 
 [tool.poetry.dependencies]
