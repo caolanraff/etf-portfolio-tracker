@@ -538,10 +538,20 @@ def plot_pie_charts(result_dict: DictFrame) -> None:
         row = i // num_cols
         col = i % num_cols
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
+
+        df = df.groupby("ticker")["notional_value"].sum()
+        total_sum = df.sum()
+        other = float(config.get("WeightingsPage", "other"))
+        threshold = other * total_sum
+        small_values = df[df < threshold]
+        if len(small_values) > 1:
+            df = df[df >= threshold]
+            df["Other"] = small_values.sum()
+
         axs[row][col].set_prop_cycle(color=palette)
         axs[row][col].pie(
-            df["notional_value"],
-            labels=df["ticker"],
+            df.values,
+            labels=df.index.to_list(),
             autopct="%1.1f%%",
             radius=1.2,
             textprops={"fontsize": 8},
@@ -580,7 +590,7 @@ def plot_combined_pie_chart(result_dict: DictFrame) -> None:
     other = float(config.get("WeightingsPage", "other"))
     threshold = other * total_sum
     small_values = df[df < threshold]
-    if len(small_values) > 0:
+    if len(small_values) > 1:
         df = df[df >= threshold]
         df["Other"] = small_values.sum()
 
