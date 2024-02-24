@@ -116,6 +116,9 @@ def get_etf_underlyings(tickers: List[str]) -> pd.DataFrame:
             names = [get_title_from_html(item[0]) for item in data]
             weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
 
+            if " bond" in get_ticker_info(ticker)["category"].lower():
+                names = [i + " (Bond)" for i in names]
+
             df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
             df.insert(0, "ticker", ticker)
             df["Company"] = df["Company"].str.title()
