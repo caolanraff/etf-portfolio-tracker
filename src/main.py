@@ -206,12 +206,13 @@ def calculate_all_portfolio_pnl() -> DictFrame:
     """
     logging.info("Calculating portfolio PnLs")
     result_dict = {}
-    file = args.path + "/data/input/" + config.get("Input", "file")
-    sheets = pd.ExcelFile(file).sheet_names
+    file = config.get("Input", "file")
+    path = f"{args.path}/data/input/{file}"
+    sheets = pd.ExcelFile(path).sheet_names
     for sheet in sheets:
-        data = pd.read_excel(file, sheet_name=sheet)
+        data = pd.read_excel(path, sheet_name=sheet)
         if len(data) == 0:
-            logging.warning("Tab is empty for " + sheet)
+            logging.warning(f"Tab is empty for {sheet}")
             continue
         res = calculate_portfolio_pnl(data)
         res = res[(res["date"] >= start_date) & (res["date"] <= end_date)]
@@ -246,8 +247,8 @@ def create_title_page(aum: str) -> None:
     pdf_output = FPDF()
     pdf_output.add_page()
     title = config.get("TitlePage", "title")
-    subtitle = end_date.strftime("%B %Y") + " Meeting"
-    aum = "AUM: " + aum
+    subtitle = f"{end_date.strftime('%B %Y')} Meeting"
+    aum = f"AUM: {aum}"
     pdf_output.set_font("Arial", "B", 36)
     pdf_output.cell(0, 80, title, 0, 1, "C")
     pdf_output.set_font("Arial", "", 24)
@@ -256,9 +257,9 @@ def create_title_page(aum: str) -> None:
     pdf_output.cell(0, 20, aum, 0, 1, "C")
     image = config.get("TitlePage", "image")
     if image != "":
-        image_file = args.path + "/data/input/" + image
+        image_file = f"{args.path}/data/input/{image}"
         pdf_output.image(image_file, x=55, y=150, w=100, h=100)
-    file = output_dir + "title.pdf"
+    file = f"{output_dir}/title.pdf"
     pdf_output.output(file)
     saved_pdf_files.append(file)
 
@@ -281,7 +282,7 @@ def get_aum(result_dict: DictFrame) -> str:
         res = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)].iloc[0]
         portfolio_val += res["portfolio_value"]
 
-    aum = "$" + "{:,.0f}".format(portfolio_val)
+    aum = f"${portfolio_val:,.0f}"
     return aum
 
 
@@ -316,7 +317,7 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
     summary.loc[summary.index[-1], "Notes"] = config.get("SummaryPage", "worst")
 
     if save_to_file:
-        pdf.df_to_pdf("Summary", summary, output_dir + "summary.pdf")
+        pdf.df_to_pdf("Summary", summary, f"{output_dir}/summary.pdf")
     else:
         print(summary)
 
@@ -367,7 +368,7 @@ def plot_performance_charts(result_dict: DictFrame, save_to_file: bool) -> None:
             labels.append(name)
         ax2.set_xlabel("Date")
         ax2.set_ylabel("PnL")
-        ax2.set_title(args.timeframe + " PnL Change", fontsize=12, fontweight="bold")
+        ax2.set_title(f"{args.timeframe} PnL Change", fontsize=12, fontweight="bold")
         ax2.set_xlim(start_date, end_date)
 
     for ax in (ax1, ax2):
@@ -375,7 +376,7 @@ def plot_performance_charts(result_dict: DictFrame, save_to_file: bool) -> None:
     fig.legend(handles, labels)
 
     if save_to_file:
-        file = output_dir + "performance.pdf"
+        file = f"{output_dir}/performance.pdf"
         plt.savefig(file)
         saved_pdf_files.append(file)
     else:
@@ -404,7 +405,7 @@ def create_new_trades_page(result_dict: DictFrame) -> None:
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
-    pdf.df_to_pdf("New Trades", result_df, output_dir + "new_trades.pdf")
+    pdf.df_to_pdf("New Trades", result_df, f"{output_dir}/new_trades.pdf")
 
 
 def create_best_and_worst_page(result_dict: DictFrame) -> None:
@@ -465,7 +466,7 @@ def create_best_and_worst_page(result_dict: DictFrame) -> None:
         result_df = pd.concat([result_df, summary], ignore_index=True)
 
     pdf.df_to_pdf(
-        "Best & Worst Performers", result_df, output_dir + "best_and_worst.pdf"
+        "Best & Worst Performers", result_df, f"{output_dir}/best_and_worst.pdf"
     )
 
 
@@ -499,19 +500,19 @@ def create_best_and_worst_combined_page(result_dict: DictFrame) -> None:
     top = top.head(5)
     top.reset_index(drop=True, inplace=True)
     result_df["Top 5 ETFs"] = top.apply(
-        lambda row: str(row["Ticker"]) + " (" + str(row["Returns"]) + "%)", axis=1
+        lambda row: f"{row['Ticker']} ({row['Returns']}%)", axis=1
     )
     bottom = returns.sort_values(by="Returns", ascending=True)
     bottom = bottom.head(5)
     bottom.reset_index(drop=True, inplace=True)
     result_df["Bottom 5 ETFs"] = bottom.apply(
-        lambda row: str(row["Ticker"]) + " (" + str(row["Returns"]) + "%)", axis=1
+        lambda row: f"{row['Ticker']} ({row['Returns']}%)", axis=1
     )
 
     pdf.df_to_pdf(
         "Best & Worst Performers Combined",
         result_df,
-        output_dir + "best_and_worst_combined.pdf",
+        f"{output_dir}/best_and_worst_combined.pdf",
     )
 
 
@@ -566,7 +567,7 @@ def plot_pie_charts(result_dict: DictFrame) -> None:
         fig.delaxes(axs[row][col])
 
     plt.suptitle("ETF Weightings", fontsize=12, fontweight="bold")
-    file = output_dir + "weightings.pdf"
+    file = f"{output_dir}/weightings.pdf"
     plt.savefig(file)
     saved_pdf_files.append(file)
 
@@ -598,7 +599,7 @@ def plot_combined_pie_chart(result_dict: DictFrame) -> None:
     df.plot(kind="pie", autopct="%1.1f%%", colors=palette, textprops={"fontsize": 8})
     plt.title("Combined ETF Weightings", fontsize=12, fontweight="bold")
     plt.ylabel("")
-    file = output_dir + "combined.pdf"
+    file = f"{output_dir}/combined.pdf"
     plt.savefig(file)
     saved_pdf_files.append(file)
 
@@ -666,7 +667,7 @@ def create_metrics_page(result_dict: DictFrame) -> None:
     operator = config.get("MetricsPage", "operator").split(",")
     highlight = config.get("MetricsPage", "highlight")
 
-    file = output_dir + "metrics.pdf"
+    file = f"{output_dir}/metrics.pdf"
     if len(threshold) > 1:
         pdf.df_to_pdf(
             "Metrics",
@@ -755,7 +756,7 @@ def create_top_holdings_page(
 
     threshold = config.get("HoldingsPage", "threshold")
 
-    file = output_dir + "holdings.pdf"
+    file = f"{output_dir}/holdings.pdf"
     if len(threshold) > 0:
         pdf.df_to_pdf(
             "Top Holdings",
@@ -810,8 +811,8 @@ def create_overlaps_page(result_dict: DictFrame, underlyings_dict: DictFrame) ->
             matrix, cmap="Blues", annot=True, fmt=".2f", annot_kws={"fontsize": 8}
         )
         sns_plot.figure.set_size_inches(10, 7)
-        sns_plot.set_title("ETF Overlaps - " + key, fontsize=12, fontweight="bold")
-        file = output_dir + "heatmap_" + key + ".pdf"
+        sns_plot.set_title(f"ETF Overlaps - {key}", fontsize=12, fontweight="bold")
+        file = f"{output_dir}/heatmap_{key}.pdf"
         pp = PdfPages(file)
         pp.savefig(sns_plot.figure)
         pp.close()
@@ -829,11 +830,12 @@ def create_descriptions_page() -> None:
     for i in tickers:
         data = get_ticker_info(i)
         if "longBusinessSummary" in data:
-            headers += [f"{data['shortName']} ({i})"]
+            name = data["shortName"]
+            headers += [f"{name} ({i})"]
             paragraphs += [data["longBusinessSummary"]]
 
     pdf.save_paragraphs_to_pdf(
-        "ETF Descriptions", headers, paragraphs, output_dir + "descriptions.pdf"
+        "ETF Descriptions", headers, paragraphs, f"{output_dir}/descriptions.pdf"
     )
 
 
@@ -848,7 +850,7 @@ def summary() -> None:
     )
     res_dict = calculate_all_portfolio_pnl()
     aum = get_aum(res_dict)
-    logging.info("AUM: " + aum)
+    logging.info(f"AUM: {aum}")
     get_summary(res_dict, False)
     plot_performance_charts(res_dict, False)
 
@@ -880,7 +882,8 @@ def report() -> None:
     create_top_holdings_page(res_dict, under_dict)
     create_overlaps_page(res_dict, under_dict)
     create_descriptions_page()
-    pdf.merge_pdfs(saved_pdf_files, output_dir + config.get("Output", "file"))
+    file = config.get("Output", "file")
+    pdf.merge_pdfs(saved_pdf_files, f"{output_dir}/{file}")
     logging.info("Complete")
 
 
@@ -891,7 +894,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     start_date = args.start_date
     end_date = args.end_date
-    output_dir = args.path + "/data/output/"
+    output_dir = f"{args.path}/data/output"
     config = configparser.ConfigParser()
-    config.read(args.path + "/" + args.config)
+    config.read(f"{args.path}/{args.config}")
     report() if args.report else summary()
