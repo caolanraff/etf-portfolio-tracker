@@ -93,6 +93,22 @@ def parse_arguments() -> Any:
     return args
 
 
+def calculate_entry_price(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate the average entry price.
+
+    This is the weighted average price, for buys only.
+    """
+    res = df[df["quantity"] > 0].copy()
+    res.loc[:, "cumulative_quantity"] = res["quantity"].cumsum()
+    res.loc[:, "cumulative_weighted_price"] = (res["quantity"] * res["price"]).cumsum()
+    res.loc[:, "average_entry_price"] = (
+        res["cumulative_weighted_price"] / res["cumulative_quantity"]
+    )
+    res = res[["date", "average_entry_price"]]
+    return res
+
+
 def calculate_portfolio_pnl(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate the profit and loss (PnL) for a specific portfolio.
@@ -129,16 +145,13 @@ def calculate_portfolio_pnl(df: pd.DataFrame) -> pd.DataFrame:
         merged_df = pd.merge(date_df, group, on=["date", "ticker"], how="outer")
         # Fill missing values with 0
         merged_df = merged_df.fillna(0)
-        # Calculate running cumulative quantity and running average entry price
+        # Calculate running cumulative quantity
         merged_df["cumulative_quantity"] = merged_df["quantity"].cumsum()
         merged_df["total_cost"] = merged_df["quantity"] * merged_df["price"]
         merged_df["cumulative_cost"] = merged_df["total_cost"].cumsum()
-        # Handle sells
-        merged_df["average_entry_price"] = np.where(
-            merged_df["cumulative_quantity"] == 0,
-            np.nan,
-            merged_df["cumulative_cost"] / merged_df["cumulative_quantity"],
-        )
+        # Calculate average entry price
+        entry_price = calculate_entry_price(merged_df)
+        merged_df = pd.merge(merged_df, entry_price, on="date", how="left")
         merged_df = merged_df.groupby("ticker").apply(
             lambda x: x.fillna(method="ffill")
         )
