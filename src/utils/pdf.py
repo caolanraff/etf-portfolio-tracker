@@ -75,10 +75,12 @@ def df_to_pdf(
                     except KeyError:
                         raise ValueError(f"Column '{col_name}' not found in dataframe")
                     if col == col_index:
-                        cell_value = float(cell.get_text().get_text())
-                        if operators[i] == ">" and cell_value > thresholds[i]:
+                        cell_value = cell.get_text().get_text()
+                        if cell_value == "-":
+                            continue
+                        if operators[i] == ">" and float(cell_value) > thresholds[i]:
                             cell.set_facecolor(highlight_colour)
-                        elif operators[i] == "<" and cell_value < thresholds[i]:
+                        elif operators[i] == "<" and float(cell_value) < thresholds[i]:
                             cell.set_facecolor(highlight_colour)
 
     ax.set_title(title, fontsize=12, fontweight="bold", y=0.9)

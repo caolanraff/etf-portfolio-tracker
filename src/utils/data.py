@@ -124,6 +124,9 @@ def get_etf_underlyings(tickers: List[str]) -> pd.DataFrame:
             df["Company"] = df["Company"].str.title()
             df_list.append(df)
 
+    if len(df_list) == 0:
+        return pd.DataFrame()
+
     result_df = pd.concat(df_list, ignore_index=True)
     return result_df
 
@@ -141,10 +144,11 @@ def get_yahoo_quote_table(ticker: str) -> Dict[str, pd.DataFrame]:
     try:
         response = requests.get(url, headers={"User-agent": "Mozilla/5.0"})
         tables = pd.read_html(StringIO(response.text))
+        data = pd.concat([tables[0], tables[1]])
+        data.columns = ["attribute", "value"]
     except Exception as e:
         print(f"Unable to get metrics from Yahoo finance for {ticker}: {e}")
-    data = pd.concat([tables[0], tables[1]])
-    data.columns = ["attribute", "value"]
+        return {}
     data = data.sort_values("attribute")
     data = data.drop_duplicates().reset_index(drop=True)
     result = {key: val for key, val in zip(data.attribute, data.value)}

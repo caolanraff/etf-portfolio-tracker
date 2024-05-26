@@ -100,9 +100,9 @@ def calculate_entry_price(df: pd.DataFrame) -> pd.DataFrame:
     This is the weighted average price, for buys only.
     """
     res = df[df["quantity"] > 0].copy()
-    res.loc[:, "cumulative_quantity"] = res["quantity"].cumsum()
-    res.loc[:, "cumulative_weighted_price"] = (res["quantity"] * res["price"]).cumsum()
-    res.loc[:, "average_entry_price"] = (
+    res["cumulative_quantity"] = res["quantity"].cumsum()
+    res["cumulative_weighted_price"] = (res["quantity"] * res["price"]).cumsum()
+    res["average_entry_price"] = (
         res["cumulative_weighted_price"] / res["cumulative_quantity"]
     )
     res = res[["date", "average_entry_price"]]
@@ -155,6 +155,7 @@ def calculate_portfolio_pnl(df: pd.DataFrame) -> pd.DataFrame:
         merged_df = merged_df.groupby("ticker").apply(
             lambda x: x.fillna(method="ffill")
         )
+        # merged_df["cumulative_cost"] = merged_df["cumulative_quantity"] * merged_df["average_entry_price"]
         result_df = pd.concat([result_df, merged_df], ignore_index=True)
 
     # Download the adjusted close price from Yahoo Finance for each ticker and date
@@ -629,9 +630,27 @@ def calculate_sharpe_ratio(ticker: str) -> float:
     data = get_ticker_data(ticker)
     min_date = end_date - timedelta(days=5 * 365)
     data = data.loc[min_date:end_date]
-    returns = data[MARK_PRICE].pct_change()
-    sharpe = qs.stats.sharpe(returns).round(2)
+    pct_chg = data[MARK_PRICE].pct_change()
+    sharpe = qs.stats.sharpe(pct_chg).round(2)
     return float(sharpe)
+
+
+def calculate_ytd(ticker: str) -> Any:
+    """
+    Calculate the YTD for a given ETF ticker.
+
+    Args:
+        ticker: The ETF ticker symbol.
+    Returns:
+        YTD.
+    """
+    data = get_ticker_data(ticker)
+    min_date = pd.to_datetime(end_date.year, format="%Y")
+    data = data.loc[min_date:end_date]
+    start = data.head(1)[MARK_PRICE][0]
+    end = data.tail(1)[MARK_PRICE][0]
+    ytd = ((end - start) / start) * 100
+    return round(ytd, 2)
 
 
 def create_metrics_page(result_dict: DictFrame) -> None:
@@ -642,14 +661,17 @@ def create_metrics_page(result_dict: DictFrame) -> None:
         result_dict: A dictionary containing portfolio data as DataFrame objects.
     """
     logging.info("Getting metrics")
-    result_df = pd.DataFrame()
+
     metrics_mapping = {
         "Beta (5Y Monthly)": "Beta",
         "Expense Ratio (net)": "Expense Ratio",
         "PE Ratio (TTM)": "PE Ratio",
         "Yield": "Dividend Yield",
-        "YTD Daily Total Return": "YTD",
     }
+    columns = (
+        ["Portfolio", "Ticker", "Sharpe Ratio"] + list(metrics_mapping.keys()) + ["YTD"]
+    )
+    result_df = pd.DataFrame(columns=columns)
 
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
@@ -663,19 +685,15 @@ def create_metrics_page(result_dict: DictFrame) -> None:
             df["Portfolio"] = key
             df["Ticker"] = ticker
             df["Sharpe Ratio"] = calculate_sharpe_ratio(ticker)
+            df["YTD"] = calculate_ytd(ticker)
             result_df = pd.concat([result_df, df], ignore_index=True)
 
     result_df["Expense Ratio (net)"] = result_df["Expense Ratio (net)"].str.rstrip("%")
     result_df["Yield"] = result_df["Yield"].str.rstrip("%")
-    result_df["YTD Daily Total Return"] = result_df[
-        "YTD Daily Total Return"
-    ].str.rstrip("%")
-    result_df = result_df[
-        ["Portfolio", "Ticker", "Sharpe Ratio"] + list(metrics_mapping.keys())
-    ]
+    result_df = result_df.fillna("-")
     result_df = result_df.rename(columns=metrics_mapping)
 
-    fields = ["Sharpe Ratio"] + list(metrics_mapping.values())
+    fields = [s for s in result_df.columns if s not in ["Portfolio", "Ticker"]]
     threshold = config.get("MetricsPage", "threshold").split(",")
     operator = config.get("MetricsPage", "operator").split(",")
     highlight = config.get("MetricsPage", "highlight")
@@ -713,6 +731,8 @@ def get_underlyings(result_dict: DictFrame) -> DictFrame:
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = df["ticker"].unique()
         underlyings = get_etf_underlyings(tickers)
+        if underlyings.empty:
+            continue
         underlyings_dict[key] = underlyings
     return underlyings_dict
 
@@ -892,8 +912,9 @@ def report() -> None:
     plot_combined_pie_chart(res_dict)
     create_metrics_page(res_dict)
     under_dict = get_underlyings(res_dict)
-    create_top_holdings_page(res_dict, under_dict)
-    create_overlaps_page(res_dict, under_dict)
+    if len(under_dict) > 1:
+        create_top_holdings_page(res_dict, under_dict)
+        create_overlaps_page(res_dict, under_dict)
     create_descriptions_page()
     file = config.get("Output", "file")
     pdf.merge_pdfs(saved_pdf_files, f"{output_dir}/{file}")
