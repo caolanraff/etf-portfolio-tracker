@@ -28,7 +28,6 @@ from utils.data import (
     get_etf_underlyings,
     get_ticker_data,
     get_ticker_info,
-    get_yahoo_quote_table,
     ticker_data,
 )
 from utils.pdf import saved_pdf_files
@@ -662,36 +661,30 @@ def create_metrics_page(result_dict: DictFrame) -> None:
     """
     logging.info("Getting metrics")
 
-    metrics_mapping = {
-        "Beta (5Y Monthly)": "Beta",
-        "Expense Ratio (net)": "Expense Ratio",
-        "PE Ratio (TTM)": "PE Ratio",
-        "Yield": "Dividend Yield",
-    }
-    columns = (
-        ["Portfolio", "Ticker", "Sharpe Ratio"] + list(metrics_mapping.keys()) + ["YTD"]
-    )
-    result_df = pd.DataFrame(columns=columns)
-
+    df_list = []
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = list(df["ticker"].unique())
         for ticker in tickers:
-            res = get_yahoo_quote_table(ticker)
-            my_dict = {
-                k: v for k, v in res.items() if k in list(metrics_mapping.keys())
-            }
-            df = pd.DataFrame([my_dict])
-            df["Portfolio"] = key
-            df["Ticker"] = ticker
-            df["Sharpe Ratio"] = calculate_sharpe_ratio(ticker)
-            df["YTD"] = calculate_ytd(ticker)
-            result_df = pd.concat([result_df, df], ignore_index=True)
+            dict = get_ticker_info(ticker)
+            df = pd.DataFrame(
+                [
+                    {
+                        "Portfolio": key,
+                        "Ticker": ticker,
+                        "Sharpe Ratio": calculate_sharpe_ratio(ticker),
+                        "Beta": dict.get("beta3Year", None),
+                        "Expense Ratio": None,
+                        "PE Ratio": None,
+                        "Yield": round(100 * dict.get("yield", 0.0), 2),
+                        "YTD": calculate_ytd(ticker),
+                    }
+                ]
+            )
+            df_list.append(df)
 
-    result_df["Expense Ratio (net)"] = result_df["Expense Ratio (net)"].str.rstrip("%")
-    result_df["Yield"] = result_df["Yield"].str.rstrip("%")
+    result_df = pd.concat(df_list, ignore_index=True)
     result_df = result_df.fillna("-")
-    result_df = result_df.rename(columns=metrics_mapping)
 
     fields = [s for s in result_df.columns if s not in ["Portfolio", "Ticker"]]
     threshold = config.get("MetricsPage", "threshold").split(",")

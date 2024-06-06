@@ -9,7 +9,6 @@ import json
 import re
 import sys
 from datetime import date
-from io import StringIO
 from typing import Dict, List
 
 import pandas as pd
@@ -41,6 +40,26 @@ def get_ticker_data(ticker: str) -> pd.DataFrame:
     data = data.reindex(pd.date_range(min(list(data.index)), date.today(), freq="D"))
     data = data.fillna(method="ffill")
     ticker_data[ticker] = data
+    return data
+
+
+def get_ticker_info(ticker: str) -> pd.DataFrame:
+    """
+    Retrieve info data for a given ticker symbol.
+
+    Args:
+        ticker: Ticker symbol for the desired ETF.
+    Returns:
+        DataFrame containing the data info for the specified ticker.
+    """
+    if ticker in ticker_info.keys():
+        return ticker_info[ticker]
+    try:
+        data = yf.Ticker(ticker).info
+    except Exception as e:
+        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
+        sys.exit()
+    ticker_info[ticker] = data
     return data
 
 
@@ -129,47 +148,3 @@ def get_etf_underlyings(tickers: List[str]) -> pd.DataFrame:
 
     result_df = pd.concat(df_list, ignore_index=True)
     return result_df
-
-
-def get_yahoo_quote_table(ticker: str) -> Dict[str, pd.DataFrame]:
-    """
-    Scrapes data elements from Yahoo Finance's quote page for a given ticker.
-
-    Args:
-        ticker: Ticker symbol of the desired ETF.
-    Returns:
-        Dictionary containing scraped data elements with attribute-value pairs.
-    """
-    url = "https://finance.yahoo.com/quote/" + ticker + "?p=" + ticker
-    try:
-        response = requests.get(url, headers={"User-agent": "Mozilla/5.0"})
-        tables = pd.read_html(StringIO(response.text))
-        data = pd.concat([tables[0], tables[1]])
-        data.columns = ["attribute", "value"]
-    except Exception as e:
-        print(f"Unable to get metrics from Yahoo finance for {ticker}: {e}")
-        return {}
-    data = data.sort_values("attribute")
-    data = data.drop_duplicates().reset_index(drop=True)
-    result = {key: val for key, val in zip(data.attribute, data.value)}
-    return result
-
-
-def get_ticker_info(ticker: str) -> pd.DataFrame:
-    """
-    Retrieve info data for a given ticker symbol.
-
-    Args:
-        ticker: Ticker symbol for the desired ETF.
-    Returns:
-        DataFrame containing the data info for the specified ticker.
-    """
-    if ticker in ticker_info.keys():
-        return ticker_info[ticker]
-    try:
-        data = yf.Ticker(ticker).info
-    except Exception as e:
-        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
-        sys.exit()
-    ticker_info[ticker] = data
-    return data
