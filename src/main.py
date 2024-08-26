@@ -146,8 +146,16 @@ def calculate_portfolio_pnl(df: pd.DataFrame) -> pd.DataFrame:
         merged_df = merged_df.fillna(0)
         # Calculate running cumulative quantity
         merged_df["cumulative_quantity"] = merged_df["quantity"].cumsum()
-        merged_df["total_cost"] = merged_df["quantity"] * merged_df["price"]
+        # Calculate cumulative cost (buys)
+        merged_df["total_cost"] = np.where(
+            merged_df["quantity"] > 0, merged_df["quantity"] * merged_df["price"], 0
+        )
         merged_df["cumulative_cost"] = merged_df["total_cost"].cumsum()
+        # Calculate cumulative proceeds (sells)
+        merged_df["total_proceeds"] = np.where(
+            merged_df["quantity"] < 0, merged_df["quantity"] * merged_df["price"], 0
+        )
+        merged_df["cumulative_proceeds"] = merged_df["total_proceeds"].cumsum()
         # Calculate average entry price
         entry_price = calculate_entry_price(merged_df)
         merged_df = pd.merge(merged_df, entry_price, on="date", how="left")
@@ -192,18 +200,20 @@ def calculate_portfolio_pnl(df: pd.DataFrame) -> pd.DataFrame:
     result_df = result_df.drop("index", axis=1)
     # Calculate the PNL per date
     result_df["portfolio_pnl"] = result_df.groupby("date")["total_pnl"].transform("sum")
+    # Calculate the portfolio cost (total_cost - total_proceeds)
+    result_df["portfolio_cost"] = result_df["cumulative_cost"] + abs(
+        result_df["cumulative_proceeds"]
+    )
+    result_df["portfolio_cost"] = result_df.groupby("date")["portfolio_cost"].transform(
+        "sum"
+    )
     # Calculate the portfolio value per date
-    result_df["portfolio_cost"] = result_df.groupby("date")[
-        "cumulative_cost"
-    ].transform("sum")
     result_df["portfolio_value"] = result_df.groupby("date")[
         "notional_value"
     ].transform("sum")
     # Calculate the PNL percentage
-    result_df["pnl_pct"] = (
-        100
-        * (result_df["portfolio_value"] - result_df["portfolio_cost"])
-        / result_df["portfolio_cost"]
+    result_df["pnl_pct"] = 100 * (
+        result_df["portfolio_pnl"] / result_df["portfolio_cost"]
     )
 
     result_df = result_df.reset_index(drop=True)
@@ -314,7 +324,7 @@ def get_summary(result_dict: DictFrame, save_to_file: bool) -> None:
         start = max(min(df["date"]).to_pydatetime(), start_date)
         first_day = df.loc[df["date"] == start].iloc[0]
         last_day = df.loc[df["date"] == end_date].iloc[0]
-        trades = df.loc[df["quantity"] != 0]
+        trades = df.loc[(df["date"] > start) & (df["quantity"] != 0)]
         pnl = (
             (last_day["portfolio_pnl"] - first_day["portfolio_pnl"])
             / (first_day["portfolio_value"] + trades["total_cost"].sum())
@@ -351,20 +361,24 @@ def plot_performance_charts(result_dict: DictFrame, save_to_file: bool) -> None:
     labels = []  # labels for the legend
 
     for name, df in result_dict.items():
-        group = df.groupby("date").agg(
-            {
-                "pnl_pct": "first",
-                "portfolio_value": "first",
-                "portfolio_pnl": "first",
-                "total_cost": "sum",
-            }
+        group = (
+            df.groupby("date")
+            .agg(
+                {
+                    "pnl_pct": "first",
+                    "portfolio_value": "first",
+                    "portfolio_pnl": "first",
+                    "total_cost": "sum",
+                }
+            )
+            .reset_index()
         )
+        group.loc[0, "total_cost"] = 0.0
         group["pnl_pct_per_date"] = (
             (group["portfolio_pnl"] - group["portfolio_pnl"].iloc[0])
             / (group["portfolio_value"].iloc[0] + group["total_cost"].cumsum())
             * 100
         )
-        group = group.reset_index()
 
         (line1,) = ax1.plot(group["date"], group["pnl_pct"], label=name)
         if name not in labels:
