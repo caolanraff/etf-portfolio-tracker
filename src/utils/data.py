@@ -44,7 +44,7 @@ def get_ticker_data(ticker: str) -> pd.DataFrame:
 
     data.index = pd.to_datetime(data.index).date
     data = data.reindex(pd.date_range(min(list(data.index)), date.today(), freq="D"))
-    data = data.fillna(method="ffill")
+    data = data.ffill()
     ticker_data[ticker] = data
     return data
 
