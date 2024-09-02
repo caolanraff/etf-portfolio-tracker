@@ -1,10 +1,11 @@
 from datetime import date
-from typing import Any
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
+from pandas.testing import assert_frame_equal
 
-from src.utils.data import get_ticker_data, get_ticker_info, ticker_data
+from src.utils.data import get_ticker_data, get_ticker_info, ticker_data, ticker_info
 
 
 def test_get_ticker_data(mocker: Any) -> None:
@@ -24,22 +25,32 @@ def test_get_ticker_data(mocker: Any) -> None:
     ticker = "AAPL"
     result = get_ticker_data(ticker)
 
+    expected = mock_data.reindex(
+        pd.date_range(min(list(mock_data.index)), date.today(), freq="D")
+    )
+    expected = expected.ffill()
+
     assert not result.empty
     assert ticker in ticker_data
-    assert result.equals(ticker_data[ticker])
-
-    expected_index = pd.date_range(start="2023-01-01", end=date.today(), freq="D")
-    assert result.index.equals(expected_index)
+    assert_frame_equal(result, expected)
     assert result.loc["2023-01-01"]["Close"] == 105
     assert result.loc[np.datetime64(date.today())]["Close"] == 107
 
 
+class TestObject:
+    @property
+    def info(self) -> Dict[str, str]:
+        return {"symbol": "AAPL", "name": "Apple Inc."}
+
+
 def test_get_ticker_info(mocker: Any) -> None:
     ticker = "AAPL"
-    expected_data = {"symbol": "AAPL", "name": "Apple Inc."}
-    mocker.patch("yfinance.Ticker.info", return_value=expected_data)
+    mocker.patch("yfinance.Ticker", return_value=TestObject())
 
     result = get_ticker_info(ticker)
-    result = result.return_value
 
-    assert result == expected_data
+    expected = {"symbol": "AAPL", "name": "Apple Inc."}
+
+    assert result
+    assert ticker in ticker_info
+    assert result == expected
