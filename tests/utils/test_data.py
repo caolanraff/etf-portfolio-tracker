@@ -5,7 +5,14 @@ import numpy as np
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from src.utils.data import get_ticker_data, get_ticker_info, ticker_data, ticker_info
+from src.utils.data import (
+    get_anchor_from_html,
+    get_ticker_data,
+    get_ticker_info,
+    get_title_from_html,
+    ticker_data,
+    ticker_info,
+)
 
 
 def test_get_ticker_data(mocker: Any) -> None:
@@ -53,4 +60,22 @@ def test_get_ticker_info(mocker: Any) -> None:
 
     assert result
     assert ticker in ticker_info
+    assert result == expected
+
+
+def test_get_title_from_html() -> None:
+    html_string = '<div title="Example Title - Subtitle"></div>'
+
+    result = get_title_from_html(html_string)
+    expected = "Example Title"
+
+    assert result == expected
+
+
+def test_get_anchor_from_html() -> None:
+    html_string = '<a href="https://example.com" rel="noopener">Example</a>'
+
+    result = get_anchor_from_html(html_string)
+    expected = "noopener"
+
     assert result == expected

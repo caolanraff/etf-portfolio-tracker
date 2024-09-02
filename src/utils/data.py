@@ -82,7 +82,9 @@ def get_title_from_html(item: str) -> str:
     """
     title_match = re.search('title="([^"]+)"', item)
     if title_match:
-        return title_match.group(1).split("-", 1)[0]
+        title = title_match.group(1)
+        title = title.split("-", 1)[0].rstrip()
+        return title
     else:
         return item
 
