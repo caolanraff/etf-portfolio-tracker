@@ -7,6 +7,7 @@ from pandas.testing import assert_frame_equal
 
 from src.utils.data import (
     get_anchor_from_html,
+    get_etf_underlyings,
     get_ticker_data,
     get_ticker_info,
     get_title_from_html,
@@ -79,3 +80,29 @@ def test_get_anchor_from_html() -> None:
     expected = "noopener"
 
     assert result == expected
+
+
+def test_get_etf_underlyings(mocker: Any) -> None:
+    mock_response = mocker.Mock()
+    mock_response.text = """
+        etf_holdings.formatted_data = [
+            ["Company A", "<a rel='AAPL'>AAPL</a>", "Sector", "10.0"],
+            ["Company B", "<a rel='MSFT'>MSFT</a>", "Sector", "20.0"]
+        ];
+    """
+    mocker.patch("requests.Session.get", return_value=mock_response)
+    mocker.patch("src.utils.data.get_ticker_info", return_value={"category": "Equity"})
+
+    tickers = ["ETF1"]
+    result = get_etf_underlyings(tickers)
+
+    expected = pd.DataFrame(
+        {
+            "ticker": ["ETF1", "ETF1"],
+            "Stock": ["AAPL", "MSFT"],
+            "Company": ["Company A", "Company B"],
+            "Weight": [10.0, 20.0],
+        }
+    )
+
+    assert_frame_equal(result, expected)
