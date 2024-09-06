@@ -123,12 +123,12 @@ def get_etf_underlyings(tickers: List[str]) -> pd.DataFrame:
     df_list = []
     for ticker in tickers:
         url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
-        headers = {
+        header = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"
         }
         with requests.Session() as req:
-            req.headers.update(headers)  # type: ignore
-            r = req.get(url)  # type: ignore
+            req.headers.update(header)
+            r = req.get(url)
             html = r.text
             start = html.find("etf_holdings.formatted_data = ") + len(
                 "etf_holdings.formatted_data = "
