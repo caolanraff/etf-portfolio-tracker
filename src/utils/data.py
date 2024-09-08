@@ -27,10 +27,11 @@ def get_ticker_data(ticker: str) -> Frame:
     """
     Retrieve historical data for a given ticker symbol.
 
-    Args:
-        ticker: Ticker symbol for the desired ETF.
+    Parameters:
+    ticker (str): Ticker symbol for the desired ETF.
+
     Returns:
-        DataFrame containing the historical data for the specified ticker.
+    Frame: DataFrame containing the historical data for the specified ticker.
     """
     if ticker in ticker_data.keys():
         return ticker_data[ticker]
@@ -56,10 +57,11 @@ def get_ticker_info(ticker: str) -> Frame:
     """
     Retrieve info data for a given ticker symbol.
 
-    Args:
-        ticker: Ticker symbol for the desired ETF.
+    Parameters:
+    ticker (str): Ticker symbol for the desired ETF.
+
     Returns:
-        DataFrame containing the data info for the specified ticker.
+    Frame: DataFrame containing the data info for the specified ticker.
     """
     if ticker in ticker_info.keys():
         return ticker_info[ticker]
@@ -78,10 +80,11 @@ def get_title_from_html(item: str) -> str:
     """
     Get title from HTML string.
 
-    Args:
-        item: HTML string
+    Parameters:
+    item (str): HTML string
+
     Returns:
-        title
+    str: title
     """
     title_match = re.search('title="([^"]+)"', item)
     if title_match:
@@ -96,10 +99,11 @@ def get_anchor_from_html(item: str) -> str:
     """
     Get anchor tag from HTML string.
 
-    Args:
-        item: HTML string
+    Parameters:
+    item (str): HTML string
+
     Returns:
-        anchor tag
+    str: anchor tag
     """
     if len(item) <= 10:
         return item
@@ -117,11 +121,12 @@ def get_etf_underlyings(ticker: str) -> Frame:
     """
     Extract underlying stock information for a list of ETF tickers.
 
-    Args:
-        ticker: List of tickers for which to extract underlying stock information.
+    Parameters:
+    ticker (str): List of tickers for which to extract underlying stock information.
+
     Returns:
-        DataFrame containing the extracted stock information, including ticker, stock symbol,
-        company name, and weight.
+    Frame: DataFrame containing the extracted stock information, including ticker, stock symbol,
+    company name, and weight.
     """
     if ticker in underlying_data.keys():
         return underlying_data[ticker]
