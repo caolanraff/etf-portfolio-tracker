@@ -4,8 +4,6 @@ Calculations required for report generation.
 Author: Caolan Rafferty
 Date: 2024-09-06
 """
-
-import logging
 from datetime import timedelta
 from typing import Any
 
@@ -59,7 +57,7 @@ def calculate_costs_and_proceeds(ticker: str, df: Frame, end_date: Time) -> Fram
 
     entry_price = calculate_entry_price(res)
     res = pd.merge(res, entry_price, on="date", how="left")
-    res = res.groupby("ticker").apply(lambda x: x.fillna(method="ffill"))
+    res = res.groupby("ticker").apply(lambda x: x.ffill())
 
     return res
 
@@ -159,14 +157,13 @@ def calculate_all_portfolio_pnl(
     Returns:
         A dictionary containing the calculated PnL for each portfolio.
     """
-    logging.info("Calculating portfolio PnLs")
     result_dict = {}
     sheets = pd.ExcelFile(path).sheet_names
 
     for sheet in sheets:
         data = pd.read_excel(path, sheet_name=sheet)
         if len(data) == 0:
-            logging.warning(f"Tab is empty for {sheet}")
+            print(f"Tab is empty for {sheet}")
             continue
         res = calculate_portfolio_pnl(data, end_date)
         res = res[(res["date"] >= start_date) & (res["date"] <= end_date)]
@@ -222,7 +219,7 @@ def calculate_ytd(ticker: str, end_date: Time) -> Any:
     data = get_ticker_data(ticker)
     min_date = pd.to_datetime(end_date.year, format="%Y")
     data = data.loc[min_date:end_date]
-    start = data.head(1)[MARK_PRICE][0]
-    end = data.tail(1)[MARK_PRICE][0]
+    start = data.head(1)[MARK_PRICE].iloc[0]
+    end = data.tail(1)[MARK_PRICE].iloc[0]
     ytd = ((end - start) / start) * 100
     return round(ytd, 2)
