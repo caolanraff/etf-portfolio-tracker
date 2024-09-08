@@ -44,7 +44,7 @@ $ poetry install
 
 ### Usage
 ```
-$ poetry run python src/main.py --help
+$ poetry run python -m src.cli.main --help
 usage: main.py [-h] [--timeframe TIMEFRAME] [--start START] [--end END] [--config CONFIG] [--report]
 
 optional arguments:
@@ -58,11 +58,11 @@ optional arguments:
 
 ##### Examples
 ```
-poetry run python src/main.py --timeframe YTD
+poetry run python -m src.cli.main --timeframe YTD
 
-poetry run python src/main.py --timeframe MTD --start 2023-05-01 --end 2023-05-30
+poetry run python -m src.cli.main --timeframe MTD --start 2023-05-01 --end 2023-05-30
 
-poetry run python src/main.py --timeframe MTD --config config/advanced.ini --report
+poetry run python -m src.cli.main --timeframe MTD --config config/advanced.ini --report
 ```
 
 ### Configuration

@@ -9,25 +9,29 @@ import json
 import re
 import sys
 from datetime import date
-from typing import Dict, List
+from typing import Dict
 
 import pandas as pd
 import requests
 import yfinance as yf
 from bs4 import BeautifulSoup
 
+from src.utils.types import Frame
+
 ticker_data: Dict[str, pd.DataFrame] = {}
 ticker_info: Dict[str, pd.DataFrame] = {}
+underlying_data: Dict[str, pd.DataFrame] = {}
 
 
-def get_ticker_data(ticker: str) -> pd.DataFrame:
+def get_ticker_data(ticker: str) -> Frame:
     """
     Retrieve historical data for a given ticker symbol.
 
-    Args:
-        ticker: Ticker symbol for the desired ETF.
+    Parameters:
+    ticker (str): Ticker symbol for the desired ETF.
+
     Returns:
-        DataFrame containing the historical data for the specified ticker.
+    Frame: DataFrame containing the historical data for the specified ticker.
     """
     if ticker in ticker_data.keys():
         return ticker_data[ticker]
@@ -49,14 +53,15 @@ def get_ticker_data(ticker: str) -> pd.DataFrame:
     return data
 
 
-def get_ticker_info(ticker: str) -> pd.DataFrame:
+def get_ticker_info(ticker: str) -> Frame:
     """
     Retrieve info data for a given ticker symbol.
 
-    Args:
-        ticker: Ticker symbol for the desired ETF.
+    Parameters:
+    ticker (str): Ticker symbol for the desired ETF.
+
     Returns:
-        DataFrame containing the data info for the specified ticker.
+    Frame: DataFrame containing the data info for the specified ticker.
     """
     if ticker in ticker_info.keys():
         return ticker_info[ticker]
@@ -75,10 +80,11 @@ def get_title_from_html(item: str) -> str:
     """
     Get title from HTML string.
 
-    Args:
-        item: HTML string
+    Parameters:
+    item (str): HTML string
+
     Returns:
-        title
+    str: title
     """
     title_match = re.search('title="([^"]+)"', item)
     if title_match:
@@ -93,10 +99,11 @@ def get_anchor_from_html(item: str) -> str:
     """
     Get anchor tag from HTML string.
 
-    Args:
-        item: HTML string
+    Parameters:
+    item (str): HTML string
+
     Returns:
-        anchor tag
+    str: anchor tag
     """
     if len(item) <= 10:
         return item
@@ -110,51 +117,49 @@ def get_anchor_from_html(item: str) -> str:
     return ""
 
 
-def get_etf_underlyings(tickers: List[str]) -> pd.DataFrame:
+def get_etf_underlyings(ticker: str) -> Frame:
     """
     Extract underlying stock information for a list of ETF tickers.
 
-    Args:
-        tickers: List of tickers for which to extract underlying stock information.
+    Parameters:
+    ticker (str): List of tickers for which to extract underlying stock information.
+
     Returns:
-        DataFrame containing the extracted stock information, including ticker, stock symbol,
-        company name, and weight.
+    Frame: DataFrame containing the extracted stock information, including ticker, stock symbol,
+    company name, and weight.
     """
-    df_list = []
-    for ticker in tickers:
-        url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"
-        }
-        with requests.Session() as req:
-            req.headers.update(headers)  # type: ignore
-            r = req.get(url)  # type: ignore
-            html = r.text
-            start = html.find("etf_holdings.formatted_data = ") + len(
-                "etf_holdings.formatted_data = "
-            )
-            end = html.find(";", start)
-            formatted_data = html[start:end].strip()
-            try:
-                data = json.loads(formatted_data)
-            except Exception as e:
-                print(f"Unable to get underlyings for {ticker}: {e}")
-                continue
+    if ticker in underlying_data.keys():
+        return underlying_data[ticker]
 
-            symbols = [get_anchor_from_html(item[1]) for item in data]
-            names = [get_title_from_html(item[0]) for item in data]
-            weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
+    url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
+    header = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"
+    }
+    with requests.Session() as req:
+        req.headers.update(header)
+        r = req.get(url)
+        html = r.text
+        start = html.find("etf_holdings.formatted_data = ") + len(
+            "etf_holdings.formatted_data = "
+        )
+        end = html.find(";", start)
+        formatted_data = html[start:end].strip()
+        try:
+            data = json.loads(formatted_data)
+        except Exception as e:
+            print(f"Unable to get underlyings for {ticker}: {e}")
+            return pd.DataFrame()
 
-            if " bond" in get_ticker_info(ticker)["category"].lower():
-                names = [i + " (Bond)" for i in names]
+        symbols = [get_anchor_from_html(item[1]) for item in data]
+        names = [get_title_from_html(item[0]) for item in data]
+        weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
 
-            df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
-            df.insert(0, "ticker", ticker)
-            df["Company"] = df["Company"].str.title()
-            df_list.append(df)
+        if " bond" in get_ticker_info(ticker)["category"].lower():
+            names = [i + " (Bond)" for i in names]
 
-    if len(df_list) == 0:
-        return pd.DataFrame()
+        df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
+        df.insert(0, "ticker", ticker)
+        df["Company"] = df["Company"].str.title()
 
-    result_df = pd.concat(df_list, ignore_index=True)
-    return result_df
+    underlying_data[ticker] = df
+    return df

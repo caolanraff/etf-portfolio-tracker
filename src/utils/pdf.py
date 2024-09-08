@@ -10,19 +10,20 @@ from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import pdfrw
 from matplotlib.backends.backend_pdf import PdfPages
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate
 
+from src.utils.types import Frame
+
 saved_pdf_files = []
 
 
 def df_to_pdf(
     title: str,
-    df: pd.DataFrame,
+    df: Frame,
     file: str,
     highlight_columns: Optional[List[str]] = None,
     thresholds: Optional[List[float]] = None,
@@ -32,14 +33,14 @@ def df_to_pdf(
     """
     Save a DataFrame as a PDF file with optional highlighting of cells based on specified conditions.
 
-    Args:
-        title: Title of the PDF document.
-        df: The DataFrame to be saved as a PDF.
-        file: The path and filename of the PDF file to be created.
-        highlight_columns: List of column names to be highlighted. Defaults to None.
-        thresholds: List of threshold values for highlighting. Defaults to None.
-        operators: List of comparison operators ('>' or '<') for highlighting. Defaults to None.
-        highlight_colour: The colour for highlighting the cells. Defaults to None.
+    Parameters:
+    title (str): Title of the PDF document.
+    df (Frame): The DataFrame to be saved as a PDF.
+    file (str): The path and filename of the PDF file to be created.
+    highlight_columns (List[str]): List of column names to be highlighted. Defaults to None.
+    thresholds (List[float]): List of threshold values for highlighting. Defaults to None.
+    operators (List[str]): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
+    highlight_colour (str): The colour for highlighting the cells. Defaults to None.
     """
     max_rows = 14
     if len(df) > max_rows:
@@ -94,9 +95,9 @@ def merge_pdfs(input_files: List[str], output_file: str) -> None:
     """
     Merge multiple PDF files into a single PDF file.
 
-    Args:
-        input_files: A list of input file paths (strings) representing the PDF files to be merged.
-        output_file: The output file path (string) where the merged PDF file will be saved.
+    Parameters:
+    input_files (List[str]): A list of input file paths (strings) representing the PDF files to be merged.
+    output_file (str): The output file path (string) where the merged PDF file will be saved.
     """
     pdf_output = pdfrw.PdfWriter()
     for file_name in input_files:
@@ -113,11 +114,11 @@ def save_paragraphs_to_pdf(
     """
     Save paragraphs to a PDF file with specified title, headings, and output file.
 
-    Args:
-        title: The main title of the document.
-        headings: A list of heading strings.
-        paragraphs: A list of paragraph strings.
-        output_file: The path to the output PDF file.
+    Parameters:
+    title (str): The main title of the document.
+    headings (List[str]): A list of heading strings.
+    paragraphs (List[str]): A list of paragraph strings.
+    output_file (str): The path to the output PDF file.
     """
     doc = SimpleDocTemplate(output_file, pagesize=letter)
     styles = getSampleStyleSheet()
