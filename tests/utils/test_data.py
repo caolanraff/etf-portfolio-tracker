@@ -86,21 +86,21 @@ def test_get_etf_underlyings(mocker: Any) -> None:
     mock_response = mocker.Mock()
     mock_response.text = """
         etf_holdings.formatted_data = [
-            ["Company A", "<a rel='AAPL'>AAPL</a>", "Sector", "10.0"],
-            ["Company B", "<a rel='MSFT'>MSFT</a>", "Sector", "20.0"]
+            ["Apple Inc.", "<a rel='AAPL'>AAPL</a>", "Technology", "10.0"],
+            ["Microsoft Corp.", "<a rel='MSFT'>MSFT</a>", "Technology", "20.0"]
         ];
     """
     mocker.patch("requests.Session.get", return_value=mock_response)
-    mocker.patch("src.utils.data.get_ticker_info", return_value={"category": "Equity"})
+    mocker.patch(
+        "src.utils.data.get_ticker_info", return_value={"category": "Technology"}
+    )
 
-    tickers = ["ETF1"]
-    result = get_etf_underlyings(tickers)
-
+    result = get_etf_underlyings("SPY")
     expected = pd.DataFrame(
         {
-            "ticker": ["ETF1", "ETF1"],
+            "ticker": ["SPY", "SPY"],
             "Stock": ["AAPL", "MSFT"],
-            "Company": ["Company A", "Company B"],
+            "Company": ["Apple Inc.", "Microsoft Corp."],
             "Weight": [10.0, 20.0],
         }
     )

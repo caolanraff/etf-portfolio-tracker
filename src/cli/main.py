@@ -220,7 +220,4 @@ if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read(args.config)
 
-    if args.report:
-        report(args, config)
-    else:
-        summary(args, config)
+    report(args, config) if args.report else summary(args, config)

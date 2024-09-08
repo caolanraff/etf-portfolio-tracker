@@ -29,8 +29,15 @@ def create_title_page(
     """
     Create a title page for a PDF document with specified information.
 
-    Args:
-        aum: Assets Under Management (AUM) value to be displayed on the title page.
+    Parameters:
+    title (str): The title of the document.
+    aum (str): The Assets Under Management (AUM) value.
+    image_file (str): The file path of an image to include on the title page.
+    end_date (Time): The end date for the document, used to generate the subtitle.
+    output_dir (str): The directory where the PDF file will be saved.
+
+    Returns:
+    str: The file path of the created title page PDF.
     """
     pdf_output = FPDF()
     pdf_output.add_page()
@@ -51,10 +58,11 @@ def create_title_page(
 
 def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> None:
     """
-    Retrieve the new trades from the result dictionary and saves them as a PDF report.
+    Retrieve the new trades from the result dictionary and save them as a PDF report.
 
-    Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
+    Parameters:
+    result_dict (DictFrame): A dictionary containing the trade results, where each key is a portfolio name and each value is a DataFrame of trades.
+    output_dir (str): The directory where the PDF report will be saved.
     """
     result_df = pd.DataFrame()
 
@@ -79,8 +87,10 @@ def create_best_and_worst_page(
     """
     Compute the best and worst performers among the ETFs in the result dictionary and saves the results as a PDF report.
 
-    Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
+    Parameters:
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    end_date (Time): The end date for calculating the performance.
+    output_dir (str): The directory where the PDF report will be saved.
     """
     result_df = pd.DataFrame()
 
@@ -144,8 +154,12 @@ def create_best_and_worst_combined_page(
     """
     Combine the best and worst performing ETFs based on their returns.
 
-    Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
+    Parameters:
+    result_dict: A dictionary containing ETF data.
+    ticker_data: A dictionary containing ticker data.
+    start_date: The start date for analysis.
+    end_date: The end date for analysis.
+    output_dir: The directory to save the output PDF file.
     """
     returns = pd.DataFrame(columns=["Ticker", "Returns"])
     result_df = pd.DataFrame()
@@ -186,7 +200,13 @@ def create_best_and_worst_combined_page(
 
 
 def create_descriptions_page(tickers: list[str], output_dir: str) -> None:
-    """Create ETF descriptions page."""
+    """
+    Create ETF descriptions page.
+
+    Parameters:
+    tickers (list[str]): A list of ticker symbols for which to create descriptions.
+    output_dir (str): The directory where the descriptions PDF will be saved.
+    """
     headers = []
     paragraphs = []
 
@@ -204,11 +224,14 @@ def create_descriptions_page(tickers: list[str], output_dir: str) -> None:
 
 def create_overlaps_page(result_dict: DictFrame, output_dir: str) -> list[str]:
     """
-    Generate an ETF overlap heatmap based on the provided result_dict and underlyings_dict.
+    Generate an ETF overlap heatmap based on the provided result_dict.
 
-    Args:
-        result_dict: A dictionary containing the result data in the form of DataFrames, where the keys represent
-        different categories and the values represent the corresponding DataFrames.
+    Parameters:
+    result_dict (DictFrame): A dictionary containing result data as DataFrames, where keys represent different categories.
+    output_dir (str): Directory path to save the generated heatmap PDF files.
+
+    Returns:
+    List of file paths for the saved heatmap PDF files.
     """
     file_list = []
     for key, df in result_dict.items():
@@ -254,11 +277,12 @@ def get_aum(result_dict: DictFrame, end_date: Time) -> str:
     """
     Calculate the Assets Under Management (AUM) based on the portfolio values in the result dictionary.
 
-    Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
-        end_date: The end date of the report.
+    Parameters:
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    end_date (Time): The end date of the report.
+
     Returns:
-        The AUM value formatted as a string.
+    The AUM value formatted as a string.
     """
     portfolio_val = 0
 
@@ -278,9 +302,13 @@ def plot_performance_charts(
     """
     Plot performance charts based on the result dictionary and optionally save them to a file.
 
-    Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
-        save_to_file: Flag indicating whether to save the performance charts as a PDF file or display them.
+    Parameters:
+    args (Any): Arguments containing the start date, end date, and timeframe for the plots.
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    output_dir (str): Directory path to save the performance charts as a PDF file. If not provided, the charts will be displayed instead.
+
+    Returns:
+    Any: The file path of the saved PDF if `output_dir` is provided, otherwise None.
     """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
     ax1.set_prop_cycle(color=CHART_PALETTE)
@@ -345,7 +373,13 @@ def plot_combined_pie_chart(
     Plot a combined pie chart representing the combined ETF weightings based on the result dictionary.
 
     Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    end_date (Time): The date for which the ETF weightings are calculated.
+    other_threshold (float): The threshold percentage for grouping small values under 'Other'.
+    output_dir (str): The directory to save the generated pie chart PDF.
+
+    Returns:
+    str: The file path of the saved pie chart PDF.
     """
     result_df = pd.DataFrame()
 
@@ -379,7 +413,13 @@ def plot_pie_charts(
     Plot pie charts representing ETF weightings based on the result dictionary.
 
     Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    end_date (Time): The date or timestamp for which the ETF weightings are calculated.
+    other_threshold (float): The threshold percentage for grouping small values under 'Other'.
+    output_dir (str): The directory path where the pie charts will be saved as a PDF file.
+
+    Returns:
+    str: The file path of the saved PDF containing the pie charts.
     """
     n = len(result_dict)
     num_cols = 3
@@ -437,10 +477,15 @@ def create_metrics_page(
     output_dir: str,
 ) -> None:
     """
-    Retrieve and process metrics for the ETFs in the result dictionary.
+    Retrieve and process metrics for the ETFs in the result dictionary, and save the results as a PDF.
 
-    Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
+    Parameters:
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    end_date (Time): The end date for calculating metrics.
+    threshold (list[str]): List of threshold values for highlighting in the PDF.
+    operator (list[str]): List of comparison operators ('>' or '<') for highlighting in the PDF.
+    highlight (str): The color for highlighting the cells in the PDF.
+    output_dir (str): The directory where the output PDF will be saved.
     """
     df_list = []
 
@@ -448,17 +493,17 @@ def create_metrics_page(
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = list(df["ticker"].unique())
         for ticker in tickers:
-            dict = get_ticker_info(ticker)
+            info = get_ticker_info(ticker)
             df = pd.DataFrame(
                 [
                     {
                         "Portfolio": key,
                         "Ticker": ticker,
                         "Sharpe Ratio": calculate_sharpe_ratio(ticker, end_date),
-                        "Beta": dict.get("beta3Year", None),
+                        "Beta": info.get("beta3Year", None),
                         "Expense Ratio": None,
                         "PE Ratio": None,
-                        "Yield": round(100 * dict.get("yield", 0.0), 2),
+                        "Yield": round(100 * info.get("yield", 0.0), 2),
                         "YTD": calculate_ytd(ticker, end_date),
                     }
                 ]
@@ -492,10 +537,15 @@ def get_summary(
     output_dir: str = "",
 ) -> None:
     """
-    Calculate and displays or saves the summary information based on the result dictionary.
+    Retrieve and process metrics for the ETFs in the result dictionary, and save the results as a PDF.
 
-    Args:
-        result_dict: A dictionary containing portfolio data as DataFrame objects.
+    Parameters:
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    end_date (Time): The end date for calculating metrics.
+    threshold (list[str]): List of threshold values for highlighting in the PDF.
+    operator (list[str]): List of comparison operators ('>' or '<') for highlighting in the PDF.
+    highlight (str): The color for highlighting the cells in the PDF.
+    output_dir (str): The directory where the output PDF will be saved.
     """
     val = []
     for key, df in result_dict.items():
@@ -533,11 +583,15 @@ def create_top_holdings_page(
     output_dir: str,
 ) -> None:
     """
-    Retrieve the top holdings based on the provided result_dict and underlyings_dict.
+    Generate a PDF report of the top holdings based on the provided result_dict and underlyings data.
 
-    Args:
-        result_dict: A dictionary containing the result data in the form of DataFrames, where the keys represent
+    Parameters:
+    result_dict (DictFrame): A dictionary containing the result data in the form of DataFrames, where the keys represent
         different categories and the values represent the corresponding DataFrames.
+    end_date (Time): The end date for filtering the data.
+    num_of_companies (int): The number of top companies to include in the report.
+    threshold (float): The threshold value for highlighting weights in the PDF.
+    output_dir (str): The directory where the output PDF file will be saved.
     """
     result_df = pd.DataFrame()
 

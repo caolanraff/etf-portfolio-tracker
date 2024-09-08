@@ -20,7 +20,13 @@ def calculate_entry_price(df: Frame) -> Frame:
     """
     Calculate the average entry price.
 
-    This is the weighted average price, for buys only.
+    This function calculates the weighted average price for buy transactions only.
+
+    Parameters:
+    df (Frame): DataFrame containing transaction data.
+
+    Returns:
+    Frame: DataFrame with the date and corresponding average entry price.
     """
     res = df[df["quantity"] > 0].copy()
     res["cumulative_quantity"] = res["quantity"].cumsum()
@@ -39,6 +45,14 @@ def calculate_costs_and_proceeds(ticker: str, df: Frame, end_date: Time) -> Fram
     This function calculates the cumulative quantity, total cost, cumulative cost, total proceeds,
     and cumulative proceeds based on the provided DataFrame.
     It also incorporates the calculation of the average entry price using the 'calculate_entry_price' function.
+
+    Parameters:
+    ticker (str): The ticker symbol for which the costs and proceeds are calculated.
+    df (Frame): DataFrame containing transaction data.
+    end_date (Time): The end date for the calculation period.
+
+    Returns:
+    Frame: DataFrame with calculated costs, proceeds, and average entry price.
     """
     date_range = pd.date_range(
         start=df["date"].min(), end=pd.Timestamp(end_date), freq="D"
@@ -66,10 +80,12 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
     """
     Calculate the profit and loss (PnL) for a specific portfolio.
 
-    Args:
-        df: A dataframe of the portfolio executions data.
+    Parameters:
+    df (Frame): DataFrame containing transaction data.
+    end_date (Time): The end date for the calculation period.
+
     Returns:
-        A DataFrame containing the calculated PnL for the portfolio.
+    Frame: DataFrame with calculated portfolio PnL, cost, value, and PnL percentage.
     """
     df["date"] = pd.to_datetime(df["date"])
     # Aggregate the trades by date, ticker
@@ -154,8 +170,14 @@ def calculate_all_portfolio_pnl(
     """
     Calculate the profit and loss (PnL) for all portfolios.
 
+    Parameters:
+    path (str): Path to the Excel file containing portfolio data.
+    start_date (Time): The start date for the calculation period.
+    end_date (Time): The end date for the calculation period.
+    benchmark (str): Ticker symbol for the benchmark portfolio.
+
     Returns:
-        A dictionary containing the calculated PnL for each portfolio.
+    DictFrame: Dictionary containing calculated PnL data for each portfolio.
     """
     result_dict = {}
     sheets = pd.ExcelFile(path).sheet_names
@@ -194,10 +216,12 @@ def calculate_sharpe_ratio(ticker: str, end_date: Time) -> float:
     """
     Calculate the Sharpe ratio for a given ETF ticker.
 
-    Args:
-        ticker: The ETF ticker symbol.
+    Parameters:
+    ticker (str): Ticker symbol for the ETF.
+    end_date (Time): End date for calculating the Sharpe ratio.
+
     Returns:
-        The Sharpe ratio.
+    float: Calculated Sharpe ratio as a float.
     """
     data = get_ticker_data(ticker)
     min_date = end_date - timedelta(days=5 * 365)
@@ -209,12 +233,14 @@ def calculate_sharpe_ratio(ticker: str, end_date: Time) -> float:
 
 def calculate_ytd(ticker: str, end_date: Time) -> Any:
     """
-    Calculate the YTD for a given ETF ticker.
+    Calculate the Sharpe ratio for a given ETF ticker.
 
-    Args:
-        ticker: The ETF ticker symbol.
+    Parameters:
+    ticker (str): Ticker symbol for the ETF.
+    end_date (Time): End date for calculating the Sharpe ratio.
+
     Returns:
-        YTD.
+    float: Calculated Sharpe ratio as a float.
     """
     data = get_ticker_data(ticker)
     min_date = pd.to_datetime(end_date.year, format="%Y")
