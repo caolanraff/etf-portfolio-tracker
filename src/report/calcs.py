@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import quantstats as qs
 
-from src.cli.const import MARK_PRICE
+from src.cli.const import MARK_PRICE, STOCK_SPLITS
 from src.utils.data import get_ticker_data
 from src.utils.types import DictFrame, Frame, Time
 
@@ -76,6 +76,22 @@ def calculate_costs_and_proceeds(ticker: str, df: Frame, end_date: Time) -> Fram
     return res
 
 
+def process_stock_splits(df: Frame, stock_splits: Frame) -> Frame:
+    """Apply stock splits to the given DataFrame."""
+    unique_tickers = set(df["ticker"].to_list())
+    split_tickers = set(stock_splits["ticker"].to_list())
+
+    if not unique_tickers.intersection(split_tickers):
+        return df
+
+    for _, row in stock_splits.iterrows():
+        mask = (df["ticker"] == row["ticker"]) & (df["date"] <= row["date"])
+        df.loc[mask, "quantity"] *= row["ratio"]
+        df.loc[mask, "price"] /= row["ratio"]
+
+    return df
+
+
 def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
     """
     Calculate the profit and loss (PnL) for a specific portfolio.
@@ -99,6 +115,9 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
         )
         .reset_index()
     )
+    # Handle stock splits
+    df = process_stock_splits(df, pd.DataFrame(STOCK_SPLITS))
+
     max_date = pd.Timestamp(end_date)
     df = df[df["date"] < max_date]
     grouped = df.groupby("ticker")

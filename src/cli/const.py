@@ -14,3 +14,5 @@ CHART_PALETTE = [
     "#bcbd22",
     "#17becf",
 ]
+
+STOCK_SPLITS = {"ticker": ["SOXX"], "date": ["2024-03-07"], "ratio": [3]}
