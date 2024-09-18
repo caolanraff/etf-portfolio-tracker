@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from src.utils.util import parse_date
+from src.utils.util import convert_to_snake_case, parse_date
 
 
 def test_parse_date() -> None:
@@ -9,5 +9,12 @@ def test_parse_date() -> None:
 
     result = parse_date(date_str, default_date)
     expected = datetime(2023, 10, 1)
+
+    assert result == expected
+
+
+def test_convert_to_snake_case() -> None:
+    result = convert_to_snake_case("New Trades")
+    expected = "new_trades"
 
     assert result == expected

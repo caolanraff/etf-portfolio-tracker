@@ -1,7 +1,11 @@
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from src.report.calcs import calculate_entry_price, process_stock_splits
+from src.report.calcs import (
+    calculate_costs_and_proceeds,
+    calculate_entry_price,
+    process_stock_splits,
+)
 
 
 def test_calculate_entry_price() -> None:
@@ -24,7 +28,25 @@ def test_calculate_entry_price() -> None:
     assert_frame_equal(result, expected)
 
 
-def test_correctly_applies_stock_splits() -> None:
+def test_calculate_costs_and_proceeds() -> None:
+    data = pd.DataFrame(
+        {
+            "date": pd.date_range(start="2023-01-01", periods=5, freq="D"),
+            "ticker": ["AAPL"] * 5,
+            "quantity": [10, -5, 15, -10, 5],
+            "price": [150, 155, 160, 165, 170],
+        }
+    )
+    end_date = "2023-01-05"
+
+    result = calculate_costs_and_proceeds("AAPL", data, end_date)
+    result = result["cumulative_quantity"].tolist()
+    expected = [10, 5, 20, 10, 15]
+
+    assert result == expected
+
+
+def test_process_stock_splits() -> None:
     data = pd.DataFrame(
         {
             "ticker": ["SOXX", "SOXX", "AAPL"],

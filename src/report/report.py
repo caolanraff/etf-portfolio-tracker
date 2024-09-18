@@ -16,6 +16,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from src.cli.const import CHART_PALETTE, MARK_PRICE
 from src.report.calcs import calculate_sharpe_ratio, calculate_ytd
+from src.report.errors import NoDataErr
 from src.utils.data import get_etf_underlyings, get_ticker_info
 from src.utils.pdf import df_to_pdf, save_paragraphs_to_pdf
 from src.utils.types import DictFrame, Time
@@ -56,13 +57,16 @@ def create_title_page(
     return file
 
 
-def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> None:
+def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> list[str]:
     """
     Retrieve the new trades from the result dictionary and save them as a PDF report.
 
     Parameters:
     result_dict (DictFrame): A dictionary containing the trade results, where each key is a portfolio name and each value is a DataFrame of trades.
     output_dir (str): The directory where the PDF report will be saved.
+
+    Returns:
+    list[str]: The file paths of the created PDFs.
     """
     result_df = pd.DataFrame()
 
@@ -78,12 +82,13 @@ def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> None:
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
-    df_to_pdf("New Trades", result_df, f"{output_dir}/new_trades.pdf")
+    files = df_to_pdf("New Trades", result_df, output_dir)
+    return files
 
 
 def create_best_and_worst_page(
     result_dict: DictFrame, end_date: Time, output_dir: str
-) -> None:
+) -> list[str]:
     """
     Compute the best and worst performers among the ETFs in the result dictionary and saves the results as a PDF report.
 
@@ -91,6 +96,9 @@ def create_best_and_worst_page(
     result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
     end_date (Time): The end date for calculating the performance.
     output_dir (str): The directory where the PDF report will be saved.
+
+    Returns:
+    list[str]: The file paths of the created PDFs.
     """
     result_df = pd.DataFrame()
 
@@ -141,7 +149,8 @@ def create_best_and_worst_page(
 
         result_df = pd.concat([result_df, summary], ignore_index=True)
 
-    df_to_pdf("Best & Worst Performers", result_df, f"{output_dir}/best_and_worst.pdf")
+    files = df_to_pdf("Best & Worst Performers", result_df, output_dir)
+    return files
 
 
 def create_best_and_worst_combined_page(
@@ -150,7 +159,7 @@ def create_best_and_worst_combined_page(
     start_date: Time,
     end_date: Time,
     output_dir: str,
-) -> None:
+) -> list[str]:
     """
     Combine the best and worst performing ETFs based on their returns.
 
@@ -160,6 +169,9 @@ def create_best_and_worst_combined_page(
     start_date: The start date for analysis.
     end_date: The end date for analysis.
     output_dir: The directory to save the output PDF file.
+
+    Returns:
+    list[str]: The file paths of the created PDFs.
     """
     returns = pd.DataFrame(columns=["Ticker", "Returns"])
     result_df = pd.DataFrame()
@@ -192,20 +204,20 @@ def create_best_and_worst_combined_page(
         lambda row: f"{row['Ticker']} ({row['Returns']}%)", axis=1
     )
 
-    df_to_pdf(
-        "Best & Worst Performers Combined",
-        result_df,
-        f"{output_dir}/best_and_worst_combined.pdf",
-    )
+    files = df_to_pdf("Best & Worst Performers Combined", result_df, output_dir)
+    return files
 
 
-def create_descriptions_page(tickers: list[str], output_dir: str) -> None:
+def create_descriptions_page(tickers: list[str], output_dir: str) -> str:
     """
     Create ETF descriptions page.
 
     Parameters:
     tickers (list[str]): A list of ticker symbols for which to create descriptions.
     output_dir (str): The directory where the descriptions PDF will be saved.
+
+    Returns:
+    str: The file path of the created PDF.
     """
     headers = []
     paragraphs = []
@@ -217,9 +229,8 @@ def create_descriptions_page(tickers: list[str], output_dir: str) -> None:
             headers += [f"{name} ({i})"]
             paragraphs += [data["longBusinessSummary"]]
 
-    save_paragraphs_to_pdf(
-        "ETF Descriptions", headers, paragraphs, f"{output_dir}/descriptions.pdf"
-    )
+    file = save_paragraphs_to_pdf("ETF Descriptions", headers, paragraphs, output_dir)
+    return file
 
 
 def create_overlaps_page(result_dict: DictFrame, output_dir: str) -> list[str]:
@@ -231,7 +242,7 @@ def create_overlaps_page(result_dict: DictFrame, output_dir: str) -> list[str]:
     output_dir (str): Directory path to save the generated heatmap PDF files.
 
     Returns:
-    List of file paths for the saved heatmap PDF files.
+    list[str]: The file paths of the created PDFs.
     """
     file_list = []
     for key, df in result_dict.items():
@@ -282,7 +293,7 @@ def get_aum(result_dict: DictFrame, end_date: Time) -> str:
     end_date (Time): The end date of the report.
 
     Returns:
-    The AUM value formatted as a string.
+    str: The AUM value.
     """
     portfolio_val = 0
 
@@ -475,7 +486,7 @@ def create_metrics_page(
     operator: list[str],
     highlight: str,
     output_dir: str,
-) -> None:
+) -> list[str]:
     """
     Retrieve and process metrics for the ETFs in the result dictionary, and save the results as a PDF.
 
@@ -486,6 +497,9 @@ def create_metrics_page(
     operator (list[str]): List of comparison operators ('>' or '<') for highlighting in the PDF.
     highlight (str): The color for highlighting the cells in the PDF.
     output_dir (str): The directory where the output PDF will be saved.
+
+    Returns:
+    list[str]: The file paths of the created PDFs.
     """
     df_list = []
 
@@ -515,17 +529,19 @@ def create_metrics_page(
     fields = [s for s in result_df.columns if s not in ["Portfolio", "Ticker"]]
 
     if len(threshold) > 1:
-        df_to_pdf(
+        files = df_to_pdf(
             "Metrics",
             result_df,
-            f"{output_dir}/metrics.pdf",
+            output_dir,
             fields,
             [float(s) for s in threshold],
             operator,
             highlight,
         )
     else:
-        df_to_pdf("Metrics", result_df, f"{output_dir}/metrics.pdf")
+        files = df_to_pdf("Metrics", result_df, output_dir)
+
+    return files
 
 
 def get_summary(
@@ -535,7 +551,7 @@ def get_summary(
     timeframe: str,
     comments: dict[str, str],
     output_dir: str = "",
-) -> None:
+) -> Any:
     """
     Retrieve and process metrics for the ETFs in the result dictionary, and save the results as a PDF.
 
@@ -546,6 +562,9 @@ def get_summary(
     operator (list[str]): List of comparison operators ('>' or '<') for highlighting in the PDF.
     highlight (str): The color for highlighting the cells in the PDF.
     output_dir (str): The directory where the output PDF will be saved.
+
+    Returns:
+    Any: The file paths of the PDFs if `output_dir` is provided, otherwise None.
     """
     val = []
     for key, df in result_dict.items():
@@ -570,7 +589,8 @@ def get_summary(
         summary.loc[summary.index[-1], "Notes"] = comments.get("worst", "")
 
     if output_dir != "":
-        df_to_pdf("Summary", summary, f"{output_dir}/summary.pdf")
+        files = df_to_pdf("Summary", summary, output_dir)
+        return files
     else:
         print(summary)
 
@@ -581,7 +601,7 @@ def create_top_holdings_page(
     num_of_companies: int,
     threshold: float,
     output_dir: str,
-) -> None:
+) -> list[str]:
     """
     Generate a PDF report of the top holdings based on the provided result_dict and underlyings data.
 
@@ -592,6 +612,9 @@ def create_top_holdings_page(
     num_of_companies (int): The number of top companies to include in the report.
     threshold (float): The threshold value for highlighting weights in the PDF.
     output_dir (str): The directory where the output PDF file will be saved.
+
+    Returns:
+    list[str]: The file paths of the created PDFs.
     """
     result_df = pd.DataFrame()
 
@@ -601,6 +624,8 @@ def create_top_holdings_page(
         underlyings = pd.concat(
             [get_etf_underlyings(ticker) for ticker in df["ticker"].unique()]
         )
+        if underlyings.empty:
+            raise NoDataErr("Unable to get underlyings data")
         underlyings = underlyings.drop_duplicates(subset=["ticker", "Stock", "Company"])
         res = pd.merge(df, underlyings, on=["ticker"], how="left")
         res["Company"] = res["Company"].str.rstrip(".")
@@ -626,14 +651,16 @@ def create_top_holdings_page(
         result_df = pd.concat([result_df, holdings], ignore_index=True)
 
     if threshold > 0.0:
-        df_to_pdf(
+        files = df_to_pdf(
             "Top Holdings",
             result_df,
-            f"{output_dir}/holdings.pdf",
+            output_dir,
             ["Weight"],
             [threshold],
             [">"],
             "red",
         )
     else:
-        df_to_pdf("Top Holdings", result_df, f"{output_dir}/holdings.pdf")
+        files = df_to_pdf("Top Holdings", result_df, output_dir)
+
+    return files
