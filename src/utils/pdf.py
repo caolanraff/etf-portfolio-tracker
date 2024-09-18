@@ -121,7 +121,7 @@ def df_to_pdf(
         file = df_to_pdf_inner(
             title,
             sub_df,
-            i,
+            i + 1,
             output_dir,
             highlight_columns,
             thresholds,
