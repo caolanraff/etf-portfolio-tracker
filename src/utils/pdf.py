@@ -36,7 +36,8 @@ def df_to_pdf_inner(
     Parameters:
     title (str): Title of the PDF document.
     df (Frame): The DataFrame to be saved as a PDF.
-    file (str): The path and filename of the PDF file to be created.
+    page (int): Page number of the file.
+    output_dir (str): The path to the output directory.
     highlight_columns (List[str]): List of column names to be highlighted. Defaults to None.
     thresholds (List[float]): List of threshold values for highlighting. Defaults to None.
     operators (List[str]): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
@@ -94,7 +95,7 @@ def df_to_pdf(
     Parameters:
     title (str): Title of the PDF document.
     df (Frame): The DataFrame to be saved as a PDF.
-    file (str): The path and filename of the PDF file to be created.
+    output_dir (str): The path to the output directory.
     highlight_columns (List[str]): List of column names to be highlighted. Defaults to None.
     thresholds (List[float]): List of threshold values for highlighting. Defaults to None.
     operators (List[str]): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
@@ -159,7 +160,10 @@ def save_paragraphs_to_pdf(
     title (str): The main title of the document.
     headings (List[str]): A list of heading strings.
     paragraphs (List[str]): A list of paragraph strings.
-    output_file (str): The path to the output PDF file.
+    output_dir (str): The path to the output directory.
+
+    Returns:
+    str: The file path of the created PDF.
     """
     file = f"{output_dir}/{convert_to_snake_case(title)}.pdf"
     doc = SimpleDocTemplate(file, pagesize=letter)
