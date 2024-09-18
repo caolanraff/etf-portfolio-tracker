@@ -88,6 +88,7 @@ def df_to_pdf(
     thresholds: Optional[List[float]] = None,
     operators: Optional[List[str]] = None,
     highlight_colour: Optional[str] = None,
+    max_rows: int = 14,
 ) -> list[str]:
     """
     Save a DataFrame as a PDF file with optional highlighting of cells based on specified conditions.
@@ -101,7 +102,6 @@ def df_to_pdf(
     operators (List[str]): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
     highlight_colour (str): The colour for highlighting the cells. Defaults to None.
     """
-    max_rows = 14
     if len(df) <= max_rows:
         file = df_to_pdf_inner(
             title,

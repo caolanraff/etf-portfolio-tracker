@@ -21,7 +21,11 @@ openpyxl = "^3.1.2"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
 pytest-mock = "^3.14.0"
+pytest-cov = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+addopts = "-vv -x -s --cov=src --cov-report term-missing"
