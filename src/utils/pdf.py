@@ -19,8 +19,6 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate
 from src.utils.types import Frame
 from src.utils.util import convert_to_snake_case
 
-saved_pdf_files = []
-
 
 def df_to_pdf_inner(
     title: str,
@@ -152,8 +150,8 @@ def merge_pdfs(input_files: List[str], output_file: str) -> None:
 
 
 def save_paragraphs_to_pdf(
-    title: str, headings: List[str], paragraphs: List[str], output_file: str
-) -> None:
+    title: str, headings: List[str], paragraphs: List[str], output_dir: str
+) -> str:
     """
     Save paragraphs to a PDF file with specified title, headings, and output file.
 
@@ -163,7 +161,8 @@ def save_paragraphs_to_pdf(
     paragraphs (List[str]): A list of paragraph strings.
     output_file (str): The path to the output PDF file.
     """
-    doc = SimpleDocTemplate(output_file, pagesize=letter)
+    file = f"{output_dir}/{convert_to_snake_case(title)}.pdf"
+    doc = SimpleDocTemplate(file, pagesize=letter)
     styles = getSampleStyleSheet()
     main_title_style = ParagraphStyle(
         name="MainTitle", parent=styles["Heading1"], alignment=1, spaceAfter=24
@@ -185,4 +184,4 @@ def save_paragraphs_to_pdf(
         elements.append(paragraph_element)
 
     doc.build(elements)
-    saved_pdf_files.append(output_file)
+    return file

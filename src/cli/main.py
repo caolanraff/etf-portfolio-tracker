@@ -29,7 +29,7 @@ from src.report.report import (
     plot_pie_charts,
 )
 from src.utils.data import ticker_data
-from src.utils.pdf import merge_pdfs, saved_pdf_files
+from src.utils.pdf import merge_pdfs
 from src.utils.util import parse_date
 
 
@@ -108,6 +108,7 @@ def report(args: Any, config: Any) -> None:
     logging.info(
         f"Running report for {args.timeframe} ({args.start_date:%Y-%m-%d} - {args.end_date:%Y-%m-%d})"
     )
+    saved_pdf_files = []
 
     logging.info("Calculating portfolio PnLs")
     filename = config.get("Input", "file")
@@ -212,7 +213,10 @@ def report(args: Any, config: Any) -> None:
     saved_pdf_files.extend(overlaps)
 
     logging.info("Creating description page")
-    create_descriptions_page(sorted(ticker_data.keys()), f"{args.path}/data/output")
+    descriptions = create_descriptions_page(
+        sorted(ticker_data.keys()), f"{args.path}/data/output"
+    )
+    saved_pdf_files.append(descriptions)
 
     output_file = config.get("Output", "file")
     merge_pdfs(saved_pdf_files, f"{args.path}/data/output/{output_file}")

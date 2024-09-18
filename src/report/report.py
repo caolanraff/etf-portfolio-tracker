@@ -198,7 +198,7 @@ def create_best_and_worst_combined_page(
     return files
 
 
-def create_descriptions_page(tickers: list[str], output_dir: str) -> None:
+def create_descriptions_page(tickers: list[str], output_dir: str) -> str:
     """
     Create ETF descriptions page.
 
@@ -216,9 +216,8 @@ def create_descriptions_page(tickers: list[str], output_dir: str) -> None:
             headers += [f"{name} ({i})"]
             paragraphs += [data["longBusinessSummary"]]
 
-    save_paragraphs_to_pdf(
-        "ETF Descriptions", headers, paragraphs, f"{output_dir}/descriptions.pdf"
-    )
+    file = save_paragraphs_to_pdf("ETF Descriptions", headers, paragraphs, output_dir)
+    return file
 
 
 def create_overlaps_page(result_dict: DictFrame, output_dir: str) -> list[str]:
