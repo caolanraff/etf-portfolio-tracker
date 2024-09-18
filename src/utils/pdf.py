@@ -17,19 +17,21 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate
 
 from src.utils.types import Frame
+from src.utils.util import convert_to_snake_case
 
 saved_pdf_files = []
 
 
-def df_to_pdf(
+def df_to_pdf_inner(
     title: str,
     df: Frame,
-    file: str,
+    page: int,
+    output_dir: str,
     highlight_columns: Optional[List[str]] = None,
     thresholds: Optional[List[float]] = None,
     operators: Optional[List[str]] = None,
     highlight_colour: Optional[str] = None,
-) -> None:
+) -> str:
     """
     Save a DataFrame as a PDF file with optional highlighting of cells based on specified conditions.
 
@@ -42,28 +44,14 @@ def df_to_pdf(
     operators (List[str]): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
     highlight_colour (str): The colour for highlighting the cells. Defaults to None.
     """
-    max_rows = 14
-    if len(df) > max_rows:
-        dfs = np.array_split(df, np.ceil(len(df) / max_rows))
-        for i, sub_df in enumerate(dfs):
-            new_file = f"{file[:-4]}_{i}.pdf"
-            df_to_pdf(
-                title,
-                sub_df,
-                new_file,
-                highlight_columns,
-                thresholds,
-                operators,
-                highlight_colour,
-            )
-        return
-
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.axis("tight")
     ax.axis("off")
+
     table = ax.table(cellText=df.values, colLabels=df.columns, loc="center")
     table.auto_set_font_size(False)
     table.set_fontsize(8)
+
     for (row, col), cell in table.get_celld().items():
         if row == 0:
             cell.set_text_props(fontweight="bold", ha="left")
@@ -85,10 +73,65 @@ def df_to_pdf(
                             cell.set_facecolor(highlight_colour)
 
     ax.set_title(title, fontsize=12, fontweight="bold", y=0.9)
+
+    file = f"{output_dir}/{convert_to_snake_case(title)}_{page}.pdf"
     pp = PdfPages(file)
     pp.savefig(fig, bbox_inches="tight")
     pp.close()
-    saved_pdf_files.append(file)
+    return file
+
+
+def df_to_pdf(
+    title: str,
+    df: Frame,
+    output_dir: str,
+    highlight_columns: Optional[List[str]] = None,
+    thresholds: Optional[List[float]] = None,
+    operators: Optional[List[str]] = None,
+    highlight_colour: Optional[str] = None,
+) -> list[str]:
+    """
+    Save a DataFrame as a PDF file with optional highlighting of cells based on specified conditions.
+
+    Parameters:
+    title (str): Title of the PDF document.
+    df (Frame): The DataFrame to be saved as a PDF.
+    file (str): The path and filename of the PDF file to be created.
+    highlight_columns (List[str]): List of column names to be highlighted. Defaults to None.
+    thresholds (List[float]): List of threshold values for highlighting. Defaults to None.
+    operators (List[str]): List of comparison operators ('>' or '<') for highlighting. Defaults to None.
+    highlight_colour (str): The colour for highlighting the cells. Defaults to None.
+    """
+    max_rows = 14
+    if len(df) <= max_rows:
+        file = df_to_pdf_inner(
+            title,
+            df,
+            1,
+            output_dir,
+            highlight_columns,
+            thresholds,
+            operators,
+            highlight_colour,
+        )
+        return [file]
+
+    dfs = np.array_split(df, np.ceil(len(df) / max_rows))
+    file_list = []
+    for i, sub_df in enumerate(dfs):
+        file = df_to_pdf_inner(
+            title,
+            sub_df,
+            i,
+            output_dir,
+            highlight_columns,
+            thresholds,
+            operators,
+            highlight_colour,
+        )
+        file_list.append(file)
+
+    return file_list
 
 
 def merge_pdfs(input_files: List[str], output_file: str) -> None:

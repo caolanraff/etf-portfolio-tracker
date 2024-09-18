@@ -56,7 +56,7 @@ def create_title_page(
     return file
 
 
-def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> None:
+def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> list[str]:
     """
     Retrieve the new trades from the result dictionary and save them as a PDF report.
 
@@ -78,12 +78,13 @@ def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> None:
         )
         result_df = pd.concat([result_df, df], ignore_index=True)
 
-    df_to_pdf("New Trades", result_df, f"{output_dir}/new_trades.pdf")
+    files = df_to_pdf("New Trades", result_df, output_dir)
+    return files
 
 
 def create_best_and_worst_page(
     result_dict: DictFrame, end_date: Time, output_dir: str
-) -> None:
+) -> list[str]:
     """
     Compute the best and worst performers among the ETFs in the result dictionary and saves the results as a PDF report.
 
@@ -141,7 +142,8 @@ def create_best_and_worst_page(
 
         result_df = pd.concat([result_df, summary], ignore_index=True)
 
-    df_to_pdf("Best & Worst Performers", result_df, f"{output_dir}/best_and_worst.pdf")
+    files = df_to_pdf("Best & Worst Performers", result_df, output_dir)
+    return files
 
 
 def create_best_and_worst_combined_page(
@@ -150,7 +152,7 @@ def create_best_and_worst_combined_page(
     start_date: Time,
     end_date: Time,
     output_dir: str,
-) -> None:
+) -> list[str]:
     """
     Combine the best and worst performing ETFs based on their returns.
 
@@ -192,11 +194,8 @@ def create_best_and_worst_combined_page(
         lambda row: f"{row['Ticker']} ({row['Returns']}%)", axis=1
     )
 
-    df_to_pdf(
-        "Best & Worst Performers Combined",
-        result_df,
-        f"{output_dir}/best_and_worst_combined.pdf",
-    )
+    files = df_to_pdf("Best & Worst Performers Combined", result_df, output_dir)
+    return files
 
 
 def create_descriptions_page(tickers: list[str], output_dir: str) -> None:
@@ -475,7 +474,7 @@ def create_metrics_page(
     operator: list[str],
     highlight: str,
     output_dir: str,
-) -> None:
+) -> list[str]:
     """
     Retrieve and process metrics for the ETFs in the result dictionary, and save the results as a PDF.
 
@@ -515,17 +514,19 @@ def create_metrics_page(
     fields = [s for s in result_df.columns if s not in ["Portfolio", "Ticker"]]
 
     if len(threshold) > 1:
-        df_to_pdf(
+        files = df_to_pdf(
             "Metrics",
             result_df,
-            f"{output_dir}/metrics.pdf",
+            output_dir,
             fields,
             [float(s) for s in threshold],
             operator,
             highlight,
         )
     else:
-        df_to_pdf("Metrics", result_df, f"{output_dir}/metrics.pdf")
+        files = df_to_pdf("Metrics", result_df, output_dir)
+
+    return files
 
 
 def get_summary(
@@ -535,7 +536,7 @@ def get_summary(
     timeframe: str,
     comments: dict[str, str],
     output_dir: str = "",
-) -> None:
+) -> Any:
     """
     Retrieve and process metrics for the ETFs in the result dictionary, and save the results as a PDF.
 
@@ -570,7 +571,8 @@ def get_summary(
         summary.loc[summary.index[-1], "Notes"] = comments.get("worst", "")
 
     if output_dir != "":
-        df_to_pdf("Summary", summary, f"{output_dir}/summary.pdf")
+        files = df_to_pdf("Summary", summary, output_dir)
+        return files
     else:
         print(summary)
 
@@ -581,7 +583,7 @@ def create_top_holdings_page(
     num_of_companies: int,
     threshold: float,
     output_dir: str,
-) -> None:
+) -> list[str]:
     """
     Generate a PDF report of the top holdings based on the provided result_dict and underlyings data.
 
@@ -626,14 +628,16 @@ def create_top_holdings_page(
         result_df = pd.concat([result_df, holdings], ignore_index=True)
 
     if threshold > 0.0:
-        df_to_pdf(
+        files = df_to_pdf(
             "Top Holdings",
             result_df,
-            f"{output_dir}/holdings.pdf",
+            output_dir,
             ["Weight"],
             [threshold],
             [">"],
             "red",
         )
     else:
-        df_to_pdf("Top Holdings", result_df, f"{output_dir}/holdings.pdf")
+        files = df_to_pdf("Top Holdings", result_df, output_dir)
+
+    return files

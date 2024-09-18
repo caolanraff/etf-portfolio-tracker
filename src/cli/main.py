@@ -123,17 +123,17 @@ def report(args: Any, config: Any) -> None:
     logging.info("Creating title page")
     title = config.get("TitlePage", "title")
     image = config.get("TitlePage", "image")
-    file = create_title_page(
+    title_page = create_title_page(
         title, aum, image, args.end_date, f"{args.path}/data/output"
     )
-    saved_pdf_files.append(file)
+    saved_pdf_files.append(title_page)
 
     logging.info("Getting summary information")
     comments = {
         "best": config.get("SummaryPage", "best"),
         "worst": config.get("SummaryPage", "worst"),
     }
-    get_summary(
+    summary = get_summary(
         res_dict,
         args.start_date,
         args.end_date,
@@ -141,27 +141,33 @@ def report(args: Any, config: Any) -> None:
         comments,
         f"{args.path}/data/output",
     )
+    saved_pdf_files.extend(summary)
 
     logging.info("Plotting performance charts")
-    file = plot_performance_charts(args, res_dict, f"{args.path}/data/output")
-    saved_pdf_files.append(file)
+    perf_charts = plot_performance_charts(args, res_dict, f"{args.path}/data/output")
+    saved_pdf_files.append(perf_charts)
     # Don't need the brenchmark for the rest of the analysis
     res_dict.pop("Benchmark", None)
 
     logging.info("Creating new trades page")
-    create_new_trades_page(res_dict, f"{args.path}/data/output")
+    new_trades = create_new_trades_page(res_dict, f"{args.path}/data/output")
+    saved_pdf_files.extend(new_trades)
 
     logging.info("Getting best and worst ETFs page")
-    create_best_and_worst_page(res_dict, args.end_date, f"{args.path}/data/output")
+    best_and_worst = create_best_and_worst_page(
+        res_dict, args.end_date, f"{args.path}/data/output"
+    )
+    saved_pdf_files.extend(best_and_worst)
 
     logging.info("Getting combined best and worst ETFs page")
-    create_best_and_worst_combined_page(
+    best_and_worst_comb = create_best_and_worst_combined_page(
         res_dict,
         ticker_data,
         args.start_date,
         args.end_date,
         f"{args.path}/data/output",
     )
+    saved_pdf_files.extend(best_and_worst_comb)
 
     logging.info("Plotting ETF weightings")
     threshold = config.get("WeightingsPage", "other")
@@ -181,7 +187,7 @@ def report(args: Any, config: Any) -> None:
     threshold = config.get("MetricsPage", "threshold").split(",")
     operator = config.get("MetricsPage", "operator").split(",")
     highlight = config.get("MetricsPage", "highlight")
-    create_metrics_page(
+    metrics = create_metrics_page(
         res_dict,
         args.end_date,
         threshold,
@@ -189,19 +195,21 @@ def report(args: Any, config: Any) -> None:
         highlight,
         f"{args.path}/data/output",
     )
+    saved_pdf_files.extend(metrics)
 
     logging.info("Getting top holdings")
     num_of_companies = config.get("HoldingsPage", "num_of_companies")
     num_of_companies = int(num_of_companies) if len(num_of_companies) > 0 else 1
     threshold = config.get("HoldingsPage", "threshold")
     threshold = float(threshold) if len(threshold) > 0 else 0.0
-    create_top_holdings_page(
+    holdings = create_top_holdings_page(
         res_dict, args.end_date, num_of_companies, threshold, f"{args.path}/data/output"
     )
+    saved_pdf_files.extend(holdings)
 
     logging.info("Plotting ETF overlap heatmap")
-    file_list = create_overlaps_page(res_dict, f"{args.path}/data/output")
-    saved_pdf_files.extend(file_list)
+    overlaps = create_overlaps_page(res_dict, f"{args.path}/data/output")
+    saved_pdf_files.extend(overlaps)
 
     logging.info("Creating description page")
     create_descriptions_page(sorted(ticker_data.keys()), f"{args.path}/data/output")
