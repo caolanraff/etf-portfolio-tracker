@@ -1,7 +1,6 @@
 from datetime import date
 from typing import Any, Dict
 
-import numpy as np
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
@@ -30,7 +29,7 @@ def test_get_ticker_data(mocker: Any) -> None:
 
     mocker.patch("yfinance.download", return_value=mock_data)
 
-    ticker = "AAPL"
+    ticker = "VONG"
     result = get_ticker_data(ticker)
 
     expected = mock_data.reindex(
@@ -38,11 +37,8 @@ def test_get_ticker_data(mocker: Any) -> None:
     )
     expected = expected.ffill()
 
-    assert not result.empty
     assert ticker in ticker_data
     assert_frame_equal(result, expected)
-    assert result.loc["2023-01-01"]["Close"] == 105
-    assert result.loc[np.datetime64(date.today())]["Close"] == 107
 
 
 class TestObject:

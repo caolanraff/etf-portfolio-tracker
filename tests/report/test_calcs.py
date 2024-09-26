@@ -1,9 +1,15 @@
+from datetime import datetime
+from typing import Any
+
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
 from src.report.calcs import (
     calculate_costs_and_proceeds,
     calculate_entry_price,
+    calculate_portfolio_pnl,
+    calculate_sharpe_ratio,
+    calculate_ytd,
     process_stock_splits,
 )
 
@@ -37,9 +43,8 @@ def test_calculate_costs_and_proceeds() -> None:
             "price": [150, 155, 160, 165, 170],
         }
     )
-    end_date = "2023-01-05"
 
-    result = calculate_costs_and_proceeds("AAPL", data, end_date)
+    result = calculate_costs_and_proceeds("AAPL", data, "2023-01-05")
     result = result["cumulative_quantity"].tolist()
     expected = [10, 5, 20, 10, 15]
 
@@ -68,5 +73,89 @@ def test_process_stock_splits() -> None:
             "price": [100, 100, 150],
         }
     )
+    assert_frame_equal(result, expected)
+
+    # no stock splits
+    result = process_stock_splits(data, pd.DataFrame(columns=["ticker"]))
+    expected = data
+    assert_frame_equal(result, expected)
+
+
+def test_calculate_portfolio_pnl(mocker: Any) -> None:
+    ticker_data = pd.DataFrame(
+        {"Adj Close": [100.0, 105.0, 110.0]},
+        index=pd.date_range(start="2023-01-01", periods=3),
+    )
+    mocker.patch("src.report.calcs.get_ticker_data", return_value=ticker_data)
+
+    data = pd.DataFrame(
+        {
+            "date": [
+                pd.Timestamp("2023-01-01"),
+                pd.Timestamp("2023-01-02"),
+                pd.Timestamp("2023-01-03"),
+            ],
+            "ticker": ["AAPL", "AAPL", "AAPL"],
+            "quantity": [10, -5, 5],
+            "price": [100.0, 105.0, 110.0],
+        }
+    )
+
+    result = calculate_portfolio_pnl(data, datetime(2023, 1, 3))
+    expected = pd.DataFrame(
+        {
+            "date": [
+                pd.Timestamp("2023-01-01"),
+                pd.Timestamp("2023-01-02"),
+                pd.Timestamp("2023-01-03"),
+            ],
+            "ticker": ["AAPL", "AAPL", "AAPL"],
+            "quantity": [10.0, -5.0, 0.0],
+            "price": [100.0, 105.0, 0.0],
+            "cumulative_quantity": [10.0, 5.0, 5.0],
+            "total_cost": [1000.0, 0.0, 0.0],
+            "cumulative_cost": [1000.0, 1000.0, 1000.0],
+            "total_proceeds": [0.0, -525.0, 0.0],
+            "cumulative_proceeds": [0.0, -525.0, -525.0],
+            "average_entry_price": [100.0, 100.0, 100.0],
+            "market_price": [100.0, 105.0, 110.0],
+            "notional_value": [1000.0, 525.0, 550.0],
+            "unrealised_pnl": [0.0, 25.0, 50.0],
+            "realised_pnl": [0.0, 25.0, 25.0],
+            "total_pnl": [0.0, 50.0, 75.0],
+            "portfolio_pnl": [0.0, 50.0, 75.0],
+            "portfolio_cost": [1000.0, 1525.0, 1525.0],
+            "portfolio_value": [1000.0, 525.0, 550.0],
+            "pnl_pct": [0.0, 3.278689, 4.918033],
+        }
+    )
 
     assert_frame_equal(result, expected)
+
+
+def test_calculate_sharpe_ratio(mocker: Any) -> None:
+    mock_data = pd.DataFrame(
+        {"Adj Close": [5, 6, 8, 10, 1]},
+        index=pd.date_range(start="2024-01-01", periods=5),
+    )
+    mocker.patch("src.utils.data.get_ticker_data", return_value=mock_data)
+
+    result = calculate_sharpe_ratio("SPY", datetime(2024, 1, 6))
+    expected = 0.64
+
+    assert result == expected
+
+
+def test_calculate_ytd(mocker: Any) -> None:
+    mock_data = pd.DataFrame(
+        {
+            "Adj Close": [100, 110, 120],
+            "Date": pd.date_range(start="2023-01-01", periods=3),
+        }
+    ).set_index("Date")
+    mocker.patch("src.utils.data.get_ticker_data", return_value=mock_data)
+
+    result = calculate_ytd("AAPL", datetime(2023, 1, 3))
+    expected = -3.74
+
+    assert result == expected
