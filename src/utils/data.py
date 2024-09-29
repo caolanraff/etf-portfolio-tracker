@@ -38,13 +38,12 @@ def get_ticker_data(ticker: str) -> Frame:
 
     try:
         data = yf.download(ticker, progress=False)
-    except Exception as e:
-        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
-        sys.exit()
-    finally:
         if not len(data):
             print(f"No data from Yahoo finance for {ticker}")
             sys.exit()
+    except Exception as e:
+        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
+        sys.exit()
 
     data.index = pd.to_datetime(data.index).date
     data = data.reindex(pd.date_range(min(list(data.index)), date.today(), freq="D"))

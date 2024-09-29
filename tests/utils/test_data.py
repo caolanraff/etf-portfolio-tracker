@@ -2,6 +2,7 @@ from datetime import date
 from typing import Any, Dict
 
 import pandas as pd
+import pytest
 from pandas.testing import assert_frame_equal
 
 from src.utils.data import (
@@ -26,19 +27,30 @@ def test_get_ticker_data(mocker: Any) -> None:
         },
         index=pd.date_range(start="2023-01-01", periods=3),
     )
-
     mocker.patch("yfinance.download", return_value=mock_data)
 
-    ticker = "VONG"
-    result = get_ticker_data(ticker)
-
+    result = get_ticker_data("VONG")
     expected = mock_data.reindex(
         pd.date_range(min(list(mock_data.index)), date.today(), freq="D")
     )
     expected = expected.ffill()
 
-    assert ticker in ticker_data
+    assert "VONG" in ticker_data
     assert_frame_equal(result, expected)
+
+    # test cache
+    result = get_ticker_data("VONG")
+    assert_frame_equal(result, expected)
+
+    # test yfinance failure
+    mocker.patch("yfinance.download", side_effect=Exception("Custom Error Message"))
+    with pytest.raises(SystemExit):
+        get_ticker_data("ABC")
+
+    # test no data
+    mocker.patch("yfinance.download", return_value=pd.DataFrame())
+    with pytest.raises(SystemExit):
+        get_ticker_data("DEF")
 
 
 class TestObject:
@@ -48,16 +60,22 @@ class TestObject:
 
 
 def test_get_ticker_info(mocker: Any) -> None:
-    ticker = "AAPL"
     mocker.patch("yfinance.Ticker", return_value=TestObject())
 
-    result = get_ticker_info(ticker)
-
+    result = get_ticker_info("AAPL")
     expected = {"symbol": "AAPL", "name": "Apple Inc."}
 
-    assert result
-    assert ticker in ticker_info
+    assert "AAPL" in ticker_info
     assert result == expected
+
+    # test cache
+    result = get_ticker_info("AAPL")
+    assert result == expected
+
+    # test yfinance failure
+    mocker.patch("yfinance.Ticker", side_effect=Exception("Custom Error Message"))
+    with pytest.raises(SystemExit):
+        get_ticker_info("ABC")
 
 
 def test_get_title_from_html() -> None:
@@ -71,11 +89,13 @@ def test_get_title_from_html() -> None:
 
 def test_get_anchor_from_html() -> None:
     html_string = '<a href="https://example.com" rel="noopener">Example</a>'
-
     result = get_anchor_from_html(html_string)
     expected = "noopener"
-
     assert result == expected
+
+    # short string
+    result = get_anchor_from_html("ABC")
+    assert result == "ABC"
 
 
 def test_get_etf_underlyings(mocker: Any) -> None:
@@ -100,5 +120,8 @@ def test_get_etf_underlyings(mocker: Any) -> None:
             "Weight": [10.0, 20.0],
         }
     )
+    assert_frame_equal(result, expected)
 
+    # test cache
+    result = get_etf_underlyings("SPY")
     assert_frame_equal(result, expected)
