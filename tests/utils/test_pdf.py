@@ -1,6 +1,7 @@
 from typing import Any
 
 import pandas as pd
+import pytest
 from matplotlib.backends.backend_pdf import PdfPages
 from reportlab.platypus import SimpleDocTemplate
 
@@ -29,6 +30,10 @@ def test_df_to_pdf(mocker: Any) -> None:
     )
     expected = [f"{output_dir}/test_title_1.pdf", f"{output_dir}/test_title_2.pdf"]
     assert result == expected
+
+    # column doesn't exist
+    with pytest.raises(ValueError):
+        df_to_pdf("Test Title", df, output_dir, ["Z"], [3.0], [">"], "red")
 
 
 def test_merge_pdfs(mocker: Any) -> None:

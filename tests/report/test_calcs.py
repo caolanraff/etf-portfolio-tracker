@@ -198,3 +198,24 @@ def test_calculate_all_portfolio_pnl(mocker: Any) -> None:
     assert "Portfolio2" in result
     assert_frame_equal(result["Portfolio1"], mock_data1)
     assert_frame_equal(result["Portfolio2"], mock_data2)
+
+
+def test_calculate_all_portfolio_pnl_benchmark(mocker: Any) -> None:
+    mock_excel = mocker.patch("pandas.ExcelFile")
+    mock_excel.return_value.sheet_names = []
+
+    ticker_data = pd.DataFrame(
+        {"Adj Close": [100.0, 105.0, 110.0]},
+        index=pd.date_range(start="2023-01-29", periods=3),
+    )
+    mocker.patch("src.report.calcs.get_ticker_data", return_value=ticker_data)
+
+    mock_calculate_pnl = mocker.patch("src.report.calcs.calculate_portfolio_pnl")
+    mock_calculate_pnl.side_effect = [ticker_data]
+
+    result = calculate_all_portfolio_pnl(
+        "dummy_path.xlsx", "2023-01-01", "2023-01-31", "SPY"
+    )
+
+    assert "Benchmark" in result
+    assert_frame_equal(result["Benchmark"], ticker_data)

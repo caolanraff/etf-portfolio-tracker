@@ -88,14 +88,18 @@ def test_get_title_from_html() -> None:
 
 
 def test_get_anchor_from_html() -> None:
-    html_string = '<a href="https://example.com" rel="noopener">Example</a>'
+    html_string = '<a href="https://example.com" rel="VONG">Example</a>'
     result = get_anchor_from_html(html_string)
-    expected = "noopener"
-    assert result == expected
+    assert result == "VONG"
 
     # short string
     result = get_anchor_from_html("ABC")
     assert result == "ABC"
+
+    # no a tag
+    html_string = '<z href="https://example.com" rel="VONG">Example</z>'
+    result = get_anchor_from_html(html_string)
+    assert result == ""
 
 
 def test_get_etf_underlyings(mocker: Any) -> None:
@@ -124,4 +128,27 @@ def test_get_etf_underlyings(mocker: Any) -> None:
 
     # test cache
     result = get_etf_underlyings("SPY")
+    assert_frame_equal(result, expected)
+
+
+def test_get_etf_underlyings_bond(mocker: Any) -> None:
+    mock_response = mocker.Mock()
+    mock_response.text = """
+        etf_holdings.formatted_data = [
+            ["Apple Inc.", "<a rel='AAPL'>AAPL</a>", "Bond", "10.0"],
+            ["Microsoft Corp.", "<a rel='MSFT'>MSFT</a>", "Bond", "20.0"]
+        ];
+    """
+    mocker.patch("requests.Session.get", return_value=mock_response)
+    mocker.patch("src.utils.data.get_ticker_info", return_value={"category": " bond"})
+
+    result = get_etf_underlyings("BIV")
+    expected = pd.DataFrame(
+        {
+            "ticker": ["BIV", "BIV"],
+            "Stock": ["AAPL", "MSFT"],
+            "Company": ["Apple Inc. (Bond)", "Microsoft Corp. (Bond)"],
+            "Weight": [10.0, 20.0],
+        }
+    )
     assert_frame_equal(result, expected)
