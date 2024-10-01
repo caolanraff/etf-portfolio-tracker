@@ -5,6 +5,7 @@ import pandas as pd
 from pandas.testing import assert_frame_equal
 
 from src.report.calcs import (
+    calculate_all_portfolio_pnl,
     calculate_costs_and_proceeds,
     calculate_entry_price,
     calculate_portfolio_pnl,
@@ -159,3 +160,41 @@ def test_calculate_ytd(mocker: Any) -> None:
     expected = -3.74
 
     assert result == expected
+
+
+def test_calculate_all_portfolio_pnl(mocker: Any) -> None:
+    mock_excel = mocker.patch("pandas.ExcelFile")
+    mock_read_excel = mocker.patch("pandas.read_excel")
+
+    mock_excel.return_value.sheet_names = ["Portfolio1", "Portfolio2", "Portfolio3"]
+    mock_data1 = pd.DataFrame(
+        {
+            "date": ["2023-01-01", "2023-01-02"],
+            "ticker": ["AAPL", "AAPL"],
+            "quantity": [10, 5],
+            "price": [150, 155],
+        }
+    )
+    mock_data2 = pd.DataFrame(
+        {
+            "date": ["2023-01-01", "2023-01-02"],
+            "ticker": ["GOOGL", "GOOGL"],
+            "quantity": [8, 4],
+            "price": [1000, 1020],
+        }
+    )
+    mock_read_excel.side_effect = [mock_data1, mock_data2, pd.DataFrame()]
+
+    mock_calculate_pnl = mocker.patch("src.report.calcs.calculate_portfolio_pnl")
+    mock_data1["cumulative_quantity"] = mock_data1["quantity"].cumsum()
+    mock_data2["cumulative_quantity"] = mock_data2["quantity"].cumsum()
+    mock_calculate_pnl.side_effect = [mock_data1, mock_data2]
+
+    result = calculate_all_portfolio_pnl(
+        "dummy_path.xlsx", "2023-01-01", "2023-01-31", ""
+    )
+
+    assert "Portfolio1" in result
+    assert "Portfolio2" in result
+    assert_frame_equal(result["Portfolio1"], mock_data1)
+    assert_frame_equal(result["Portfolio2"], mock_data2)

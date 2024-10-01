@@ -2,8 +2,9 @@ from typing import Any
 
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
+from reportlab.platypus import SimpleDocTemplate
 
-from src.utils.pdf import df_to_pdf, merge_pdfs
+from src.utils.pdf import df_to_pdf, merge_pdfs, save_paragraphs_to_pdf
 
 
 def test_df_to_pdf(mocker: Any) -> None:
@@ -53,3 +54,18 @@ def test_merge_pdfs(mocker: Any) -> None:
     assert mock_os_remove.call_count == len(input_files)
     for call in mock_os_remove.call_args_list:
         assert call[0][0] in input_files
+
+
+def test_save_paragraphs_to_pdf(mocker: Any) -> None:
+    mocker.patch("src.utils.pdf.convert_to_snake_case", return_value="test_title")
+    mocker.patch("reportlab.platypus.SimpleDocTemplate.build")
+
+    title = "Test Title"
+    headings = ["Heading 1", "Heading 2"]
+    paragraphs = ["Paragraph 1", "Paragraph 2"]
+    output_dir = "/tmp"
+
+    file_path = save_paragraphs_to_pdf(title, headings, paragraphs, output_dir)
+
+    assert file_path == "/tmp/test_title.pdf"
+    SimpleDocTemplate.build.assert_called_once()
