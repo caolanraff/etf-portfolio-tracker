@@ -10,6 +10,7 @@ from src.report.report import (
     create_best_and_worst_page,
     create_descriptions_page,
     create_new_trades_page,
+    create_overlaps_page,
     get_aum,
 )
 
@@ -147,3 +148,24 @@ def test_create_descriptions_page(mocker: Any) -> None:
         ["Summary AAPL", "Summary GOOGL"],
         output_dir,
     )
+
+
+def test_create_overlaps_page(mocker: Any) -> None:
+    mocker.patch(
+        "src.report.report.get_etf_underlyings",
+        return_value=pd.DataFrame(
+            {
+                "ticker": ["ETF1", "ETF2"],
+                "Stock": ["AAPL", "GOOGL"],
+                "Company": ["Apple Inc.", "Alphabet Inc."],
+                "Weight": [0.5, 0.5],
+            }
+        ),
+    )
+
+    result_dict = {"Portfolio1": pd.DataFrame({"ticker": ["ETF1", "ETF2"]})}
+    output_dir = "/tmp"
+
+    result = create_overlaps_page(result_dict, output_dir)
+
+    assert result == ["/tmp/heatmap_Portfolio1.pdf"]
