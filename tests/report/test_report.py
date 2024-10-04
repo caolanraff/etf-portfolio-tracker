@@ -1,4 +1,5 @@
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -12,6 +13,8 @@ from src.report.report import (
     create_new_trades_page,
     create_overlaps_page,
     get_aum,
+    plot_combined_pie_chart,
+    plot_performance_charts,
 )
 
 
@@ -169,3 +172,51 @@ def test_create_overlaps_page(mocker: Any) -> None:
     result = create_overlaps_page(result_dict, output_dir)
 
     assert result == ["/tmp/heatmap_Portfolio1.pdf"]
+
+
+def test_plot_performance_charts(mocker: Any) -> None:
+    mocker.patch("matplotlib.pyplot.savefig")
+    plt = mocker.patch("matplotlib.pyplot.show")
+
+    result_dict = {
+        "Portfolio1": pd.DataFrame(
+            {
+                "date": pd.date_range(start="2023-01-01", periods=3, freq="D"),
+                "pnl_pct": [0.1, 0.2, 0.3],
+                "portfolio_value": [100, 110, 120],
+                "portfolio_pnl": [10, 20, 30],
+                "total_cost": [1, 2, 3],
+            }
+        )
+    }
+    args = SimpleNamespace(
+        start_date="2023-01-01", end_date="2023-01-03", timeframe="Daily"
+    )
+
+    result = plot_performance_charts(args, result_dict, "/tmp")
+    assert result == "/tmp/performance.pdf"
+
+    plot_performance_charts(args, result_dict)
+    plt.assert_called_once()
+
+
+def test_plot_combined_pie_chart(mocker: Any) -> None:
+    mocker.patch("matplotlib.pyplot.savefig")
+
+    result_dict = {
+        "portfolio1": pd.DataFrame(
+            {
+                "date": [datetime(2023, 10, 1), datetime(2023, 10, 1)],
+                "ticker": ["AAPL", "GOOGL"],
+                "cumulative_quantity": [10, 15],
+                "notional_value": [1500, 2000],
+            }
+        )
+    }
+    end_date = datetime(2023, 10, 1)
+    other_threshold = 0.9
+    output_dir = "/tmp"
+
+    result = plot_combined_pie_chart(result_dict, end_date, other_threshold, output_dir)
+
+    assert result == "/tmp/combined.pdf"
