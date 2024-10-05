@@ -528,7 +528,7 @@ def create_metrics_page(
     result_df = result_df.fillna("-")
     fields = [s for s in result_df.columns if s not in ["Portfolio", "Ticker"]]
 
-    if len(threshold) > 1:
+    if threshold[0] != "":
         files = df_to_pdf(
             "Metrics",
             result_df,

@@ -4,8 +4,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.cli.const import MARK_PRICE
+from src.report.errors import NoDataErr
 from src.report.report import (
     create_best_and_worst_combined_page,
     create_best_and_worst_page,
@@ -14,7 +16,9 @@ from src.report.report import (
     create_new_trades_page,
     create_overlaps_page,
     create_title_page,
+    create_top_holdings_page,
     get_aum,
+    get_summary,
     plot_combined_pie_chart,
     plot_performance_charts,
     plot_pie_charts,
@@ -274,7 +278,7 @@ def test_plot_pie_charts(mocker: Any) -> None:
     plt.assert_called_once_with("/tmp/weightings.pdf")
 
 
-def test_generate_pdf_for_each_etf(mocker: Any) -> None:
+def test_create_metrics_page(mocker: Any) -> None:
     mocker.patch(
         "src.report.report.get_ticker_info",
         return_value={"beta3Year": 1.2, "yield": 0.03},
@@ -310,5 +314,80 @@ def test_generate_pdf_for_each_etf(mocker: Any) -> None:
     result = create_metrics_page(
         result_dict, end_date, threshold, operator, highlight, output_dir
     )
-
     assert result == ["/path/to/pdf1", "/path/to/pdf2"]
+
+    result = create_metrics_page(
+        result_dict, end_date, [""], operator, highlight, output_dir
+    )
+    assert result == ["/path/to/pdf1", "/path/to/pdf2"]
+
+
+def test_get_summary(mocker: Any) -> None:
+    result_dict = {
+        "ETF1": pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-01", "2023-01-02"]),
+                "portfolio_pnl": [1000, 1100],
+                "portfolio_value": [10000, 11000],
+                "quantity": [0, 10],
+                "total_cost": [0, 100],
+            }
+        )
+    }
+    start_date = datetime(2023, 1, 1)
+    end_date = datetime(2023, 1, 2)
+    timeframe = "YTD"
+    comments = {"best": "Best performance", "worst": "Worst performance"}
+    output_dir = "/tmp"
+
+    result = get_summary(
+        result_dict, start_date, end_date, timeframe, comments, output_dir
+    )
+    assert result == ["/tmp/summary_1.pdf"]
+
+    result = get_summary(result_dict, start_date, end_date, timeframe, comments, "")
+    assert result is None
+
+
+def test_create_top_holdings_page(mocker: Any) -> None:
+    mock_data = pd.DataFrame(
+        {
+            "ticker": ["AAPL", "GOOGL"],
+            "Stock": ["AAPL", "GOOGL"],
+            "Company": ["Apple Inc.", "Alphabet Inc."],
+            "Weight": [50.0, 50.0],
+        }
+    )
+    mocker.patch("src.report.report.get_etf_underlyings", return_value=mock_data)
+    mocker.patch("src.utils.pdf.df_to_pdf", return_value=["/path/to/pdf1.pdf"])
+
+    result_dict = {
+        "Tech": pd.DataFrame(
+            {
+                "date": [pd.Timestamp("2023-10-01")],
+                "cumulative_quantity": [100],
+                "ticker": ["AAPL"],
+                "notional_value": [1000.0],
+            }
+        )
+    }
+    end_date = pd.Timestamp("2023-10-01")
+    num_of_companies = 1
+    threshold = 10.0
+    output_dir = "/tmp"
+
+    result = create_top_holdings_page(
+        result_dict, end_date, num_of_companies, threshold, output_dir
+    )
+    assert result == ["/tmp/top_holdings_1.pdf"]
+
+    result = create_top_holdings_page(
+        result_dict, end_date, num_of_companies, 0.0, output_dir
+    )
+    assert result == ["/tmp/top_holdings_1.pdf"]
+
+    mocker.patch("src.report.report.get_etf_underlyings", return_value=pd.DataFrame())
+    with pytest.raises(NoDataErr):
+        create_top_holdings_page(
+            result_dict, end_date, num_of_companies, 0.0, output_dir
+        )
