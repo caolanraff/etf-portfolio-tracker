@@ -10,11 +10,14 @@ from src.report.report import (
     create_best_and_worst_combined_page,
     create_best_and_worst_page,
     create_descriptions_page,
+    create_metrics_page,
     create_new_trades_page,
     create_overlaps_page,
+    create_title_page,
     get_aum,
     plot_combined_pie_chart,
     plot_performance_charts,
+    plot_pie_charts,
 )
 
 
@@ -220,3 +223,92 @@ def test_plot_combined_pie_chart(mocker: Any) -> None:
     result = plot_combined_pie_chart(result_dict, end_date, other_threshold, output_dir)
 
     assert result == "/tmp/combined.pdf"
+
+
+def test_create_title_page(mocker: Any) -> None:
+    mocker.patch("fpdf.FPDF.output", return_value=None)
+    mocker.patch("fpdf.FPDF.add_page", return_value=None)
+    mocker.patch("fpdf.FPDF.set_font", return_value=None)
+    mocker.patch("fpdf.FPDF.cell", return_value=None)
+    mocker.patch("fpdf.FPDF.image", return_value=None)
+
+    title = "Annual Report"
+    aum = "1 Billion USD"
+    image_file = "path/to/image.png"
+    end_date = datetime(2023, 10, 1)
+    output_dir = "/tmp"
+
+    result = create_title_page(title, aum, image_file, end_date, output_dir)
+
+    assert result == f"{output_dir}/title.pdf"
+
+
+def test_plot_pie_charts(mocker: Any) -> None:
+    plt = mocker.patch("matplotlib.pyplot.savefig")
+
+    result_dict = {
+        "Portfolio1": pd.DataFrame(
+            {
+                "date": [datetime(2023, 10, 1), datetime(2023, 10, 1)],
+                "ticker": ["AAPL", "GOOGL"],
+                "cumulative_quantity": [10, 15],
+                "notional_value": [1500, 2500],
+            }
+        ),
+        "Portfolio2": pd.DataFrame(
+            {
+                "date": [datetime(2023, 10, 1), datetime(2023, 10, 1)],
+                "ticker": ["MSFT", "AMZN"],
+                "cumulative_quantity": [5, 20],
+                "notional_value": [1000, 3000],
+            }
+        ),
+    }
+    end_date = datetime(2023, 10, 1)
+    other_threshold = 0.9
+    output_dir = "/tmp"
+
+    result = plot_pie_charts(result_dict, end_date, other_threshold, output_dir)
+
+    assert result == "/tmp/weightings.pdf"
+    plt.assert_called_once_with("/tmp/weightings.pdf")
+
+
+def test_generate_pdf_for_each_etf(mocker: Any) -> None:
+    mocker.patch(
+        "src.report.report.get_ticker_info",
+        return_value={"beta3Year": 1.2, "yield": 0.03},
+    )
+    mocker.patch("src.report.report.calculate_sharpe_ratio", return_value=1.5)
+    mocker.patch("src.report.report.calculate_ytd", return_value=10.0)
+    mocker.patch(
+        "src.report.report.df_to_pdf", return_value=["/path/to/pdf1", "/path/to/pdf2"]
+    )
+
+    result_dict = {
+        "Portfolio1": pd.DataFrame(
+            {
+                "date": [pd.Timestamp("2023-10-01")],
+                "cumulative_quantity": [100],
+                "ticker": ["ETF1"],
+            }
+        ),
+        "Portfolio2": pd.DataFrame(
+            {
+                "date": [pd.Timestamp("2023-10-01")],
+                "cumulative_quantity": [200],
+                "ticker": ["ETF2"],
+            }
+        ),
+    }
+    end_date = pd.Timestamp("2023-10-01")
+    threshold = ["0.5"]
+    operator = [">"]
+    highlight = "red"
+    output_dir = "/output/dir"
+
+    result = create_metrics_page(
+        result_dict, end_date, threshold, operator, highlight, output_dir
+    )
+
+    assert result == ["/path/to/pdf1", "/path/to/pdf2"]
