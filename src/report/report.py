@@ -356,10 +356,7 @@ def plot_performance_charts(
         ax1.set_title("Overall PnL Change", fontsize=12, fontweight="bold")
         ax1.set_xlim(args.start_date, args.end_date)
 
-        (line2,) = ax2.plot(group["date"], group["pnl_pct_per_date"], label=name)
-        if name not in labels:
-            handles.append(line2)
-            labels.append(name)
+        ax2.plot(group["date"], group["pnl_pct_per_date"], label=name)
         ax2.set_xlabel("Date")
         ax2.set_ylabel("PnL")
         ax2.set_title(f"{args.timeframe} PnL Change", fontsize=12, fontweight="bold")

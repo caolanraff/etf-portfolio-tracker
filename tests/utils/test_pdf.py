@@ -1,4 +1,5 @@
 from typing import Any
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
@@ -41,7 +42,11 @@ def test_merge_pdfs(mocker: Any) -> None:
     output_file = "merged.pdf"
 
     mock_pdf_writer = mocker.patch("pdfrw.PdfWriter")
+
     mock_pdf_reader = mocker.patch("pdfrw.PdfReader")
+    pdf_reader_instance = mock_pdf_reader.return_value
+    pdf_reader_instance.pages = [MagicMock(), MagicMock()]
+
     mock_os_remove = mocker.patch("os.remove")
 
     merge_pdfs(input_files, output_file)

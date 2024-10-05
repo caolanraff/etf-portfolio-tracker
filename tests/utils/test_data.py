@@ -130,6 +130,11 @@ def test_get_etf_underlyings(mocker: Any) -> None:
     result = get_etf_underlyings("SPY")
     assert_frame_equal(result, expected)
 
+    # test exception
+    mocker.patch("json.loads", side_effect=Exception("JSON decoding error"))
+    result = get_etf_underlyings("VOO")
+    assert_frame_equal(result, pd.DataFrame())
+
 
 def test_get_etf_underlyings_bond(mocker: Any) -> None:
     mock_response = mocker.Mock()
