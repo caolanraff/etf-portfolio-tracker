@@ -295,15 +295,15 @@ def get_aum(result_dict: DictFrame, end_date: Time) -> str:
     Returns:
     str: The AUM value.
     """
-    portfolio_val = 0
+    portfolio_val = []
 
     for name, df in result_dict.items():
         if name == "Benchmark":
             continue
         res = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)].iloc[0]
-        portfolio_val += res["portfolio_value"]
+        portfolio_val += [res["portfolio_value"]]
 
-    aum = f"${portfolio_val:,.0f}"
+    aum = f"${sum(portfolio_val):,.0f}"
     return aum
 
 

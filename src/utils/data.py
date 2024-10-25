@@ -45,6 +45,7 @@ def get_ticker_data(ticker: str) -> Frame:
         print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
         sys.exit()
 
+    data.columns = data.columns.droplevel(1)
     data.index = pd.to_datetime(data.index).date
     data = data.reindex(pd.date_range(min(list(data.index)), date.today(), freq="D"))
     data = data.ffill()
