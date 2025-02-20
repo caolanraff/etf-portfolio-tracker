@@ -1,6 +1,6 @@
 """Constant definitions."""
 
-MARK_PRICE = "Adj Close"
+MARK_PRICE = "Close"
 
 CHART_PALETTE = [
     "#1f77b4",

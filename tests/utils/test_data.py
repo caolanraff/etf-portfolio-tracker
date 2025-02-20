@@ -17,15 +17,18 @@ from src.utils.data import (
 
 
 def test_get_ticker_data(mocker: Any) -> None:
+    price_metrics = ["Open", "High", "Low", "Close", "Volume"]
+    multi_index = pd.MultiIndex.from_product(
+        [price_metrics, ["VONG"]], names=["Price", "Ticker"]
+    )
     mock_data = pd.DataFrame(
-        {
-            "Open": [100, 101, 102],
-            "High": [110, 111, 112],
-            "Low": [90, 91, 92],
-            "Close": [105, 106, 107],
-            "Volume": [1000, 1100, 1200],
-        },
+        [
+            [100, 110, 90, 105, 1000],
+            [101, 111, 91, 106, 1100],
+            [102, 112, 92, 107, 1200],
+        ],
         index=pd.date_range(start="2023-01-01", periods=3),
+        columns=multi_index,
     )
     mocker.patch("yfinance.download", return_value=mock_data)
 

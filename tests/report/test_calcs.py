@@ -84,7 +84,7 @@ def test_process_stock_splits() -> None:
 
 def test_calculate_portfolio_pnl(mocker: Any) -> None:
     ticker_data = pd.DataFrame(
-        {"Adj Close": [100.0, 105.0, 110.0]},
+        {"Close": [100.0, 105.0, 110.0]},
         index=pd.date_range(start="2023-01-01", periods=3),
     )
     mocker.patch("src.report.calcs.get_ticker_data", return_value=ticker_data)
@@ -136,7 +136,7 @@ def test_calculate_portfolio_pnl(mocker: Any) -> None:
 
 def test_calculate_sharpe_ratio(mocker: Any) -> None:
     mock_data = pd.DataFrame(
-        {"Adj Close": [5, 6, 8, 10, 1]},
+        {"Close": [5, 6, 8, 10, 1]},
         index=pd.date_range(start="2024-01-01", periods=5),
     )
     mocker.patch("src.utils.data.get_ticker_data", return_value=mock_data)
@@ -150,7 +150,7 @@ def test_calculate_sharpe_ratio(mocker: Any) -> None:
 def test_calculate_ytd(mocker: Any) -> None:
     mock_data = pd.DataFrame(
         {
-            "Adj Close": [100, 110, 120],
+            "Close": [100, 110, 120],
             "Date": pd.date_range(start="2023-01-01", periods=3),
         }
     ).set_index("Date")
@@ -205,7 +205,7 @@ def test_calculate_all_portfolio_pnl_benchmark(mocker: Any) -> None:
     mock_excel.return_value.sheet_names = []
 
     ticker_data = pd.DataFrame(
-        {"Adj Close": [100.0, 105.0, 110.0]},
+        {"Close": [100.0, 105.0, 110.0]},
         index=pd.date_range(start="2023-01-29", periods=3),
     )
     mocker.patch("src.report.calcs.get_ticker_data", return_value=ticker_data)
