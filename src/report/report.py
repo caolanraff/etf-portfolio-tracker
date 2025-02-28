@@ -185,8 +185,9 @@ def create_best_and_worst_combined_page(
         returns = pd.concat([returns, df], ignore_index=True)
 
     for key, df in result_dict.items():
-        start = max(min(df["date"]).to_pydatetime(), start_date)
-        df = df.loc[(df["date"] == start) & (df["cumulative_quantity"] > 0)]
+        df = df.loc[
+            (df["date"].between(start_date, end_date)) & (df["cumulative_quantity"] > 0)
+        ]
         tickers += df["ticker"].to_list()
 
     returns = returns.loc[returns["Ticker"].isin(tickers)]
