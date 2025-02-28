@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.cli.const import MARK_PRICE
 from src.report.errors import NoDataErr
@@ -179,6 +178,13 @@ def test_create_overlaps_page(mocker: Any) -> None:
     result = create_overlaps_page(result_dict, output_dir)
 
     assert result == ["/tmp/heatmap_Portfolio1.pdf"]
+
+    mocker.patch(
+        "src.report.report.get_etf_underlyings",
+        side_effect=NoDataErr("Unable to get underlyings data"),
+    )
+    result = create_overlaps_page(result_dict, output_dir)
+    assert result == []
 
 
 def test_plot_performance_charts(mocker: Any) -> None:
@@ -386,8 +392,11 @@ def test_create_top_holdings_page(mocker: Any) -> None:
     )
     assert result == ["/tmp/top_holdings_1.pdf"]
 
-    mocker.patch("src.report.report.get_etf_underlyings", return_value=pd.DataFrame())
-    with pytest.raises(NoDataErr):
-        create_top_holdings_page(
-            result_dict, end_date, num_of_companies, 0.0, output_dir
-        )
+    mocker.patch(
+        "src.report.report.get_etf_underlyings",
+        side_effect=NoDataErr("Unable to get underlyings data"),
+    )
+    result = create_top_holdings_page(
+        result_dict, end_date, num_of_companies, 0.0, output_dir
+    )
+    assert result == []

@@ -16,6 +16,7 @@ import requests
 import yfinance as yf
 from bs4 import BeautifulSoup
 
+from src.report.errors import NoDataErr
 from src.utils.types import Frame
 
 ticker_data: Dict[str, pd.DataFrame] = {}
@@ -37,7 +38,7 @@ def get_ticker_data(ticker: str) -> Frame:
         return ticker_data[ticker]
 
     try:
-        data = yf.download(ticker, progress=False)
+        data = yf.download(ticker, progress=False, auto_adjust=True)
         if not len(data):
             print(f"No data from Yahoo finance for {ticker}")
             sys.exit()
@@ -146,11 +147,13 @@ def get_etf_underlyings(ticker: str) -> Frame:
         formatted_data = html[start:end].strip()
         try:
             data = json.loads(formatted_data)
-        except Exception as e:
-            print(f"Unable to get underlyings for {ticker}: {e}")
-            return pd.DataFrame()
+        except Exception:
+            raise NoDataErr("Unable to get underlyings data")
 
         symbols = [get_anchor_from_html(item[1]) for item in data]
+        if len(symbols) == 1:
+            raise NoDataErr("Unable to get underlyings data")
+
         names = [get_title_from_html(item[0]) for item in data]
         weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
 

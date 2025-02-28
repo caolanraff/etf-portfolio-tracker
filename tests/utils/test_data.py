@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+from src.report.errors import NoDataErr
 from src.utils.data import (
     get_anchor_from_html,
     get_etf_underlyings,
@@ -135,8 +136,12 @@ def test_get_etf_underlyings(mocker: Any) -> None:
 
     # test exception
     mocker.patch("json.loads", side_effect=Exception("JSON decoding error"))
-    result = get_etf_underlyings("VOO")
-    assert_frame_equal(result, pd.DataFrame())
+    with pytest.raises(NoDataErr):
+        get_etf_underlyings("VOO")
+
+    mocker.patch("json.loads", return_value=[["NA", "NA", "NA", "NA", "NA"]])
+    with pytest.raises(NoDataErr):
+        get_etf_underlyings("VOO")
 
 
 def test_get_etf_underlyings_bond(mocker: Any) -> None:
