@@ -21,7 +21,6 @@ from src.utils.types import Frame
 
 ticker_data: Dict[str, pd.DataFrame] = {}
 ticker_info: Dict[str, pd.DataFrame] = {}
-underlying_data: Dict[str, pd.DataFrame] = {}
 
 
 def get_ticker_data(ticker: str) -> Frame:
@@ -118,9 +117,9 @@ def get_anchor_from_html(item: str) -> str:
     return ""
 
 
-def get_etf_underlyings(ticker: str) -> Frame:
+def get_etf_underlyings_external(ticker: str) -> Frame:
     """
-    Extract underlying stock information for a list of ETF tickers.
+    Extract underlying stock information for a list of ETF tickers from www.zacks.com, storing the data locally.
 
     Parameters:
     ticker (str): List of tickers for which to extract underlying stock information.
@@ -129,9 +128,6 @@ def get_etf_underlyings(ticker: str) -> Frame:
     Frame: DataFrame containing the extracted stock information, including ticker, stock symbol,
     company name, and weight.
     """
-    if ticker in underlying_data.keys():
-        return underlying_data[ticker]
-
     url = f"https://www.zacks.com/funds/etf/{ticker}/holding"
     header = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:83.0) Gecko/20100101 Firefox/83.0"
@@ -164,5 +160,47 @@ def get_etf_underlyings(ticker: str) -> Frame:
         df.insert(0, "ticker", ticker)
         df["Company"] = df["Company"].str.title()
 
-    underlying_data[ticker] = df
+    file_name = f"data/input/etf_underlyings/{ticker}.csv"
+    df.to_csv(file_name, index=False)
     return df
+
+
+def get_etf_underlyings_internal(ticker: str) -> Frame:
+    """
+    Extract underlying stock information for a list of ETF tickers local CSV files.
+
+    Parameters:
+    ticker (str): List of tickers for which to extract underlying stock information.
+
+    Returns:
+    Frame: DataFrame containing the extracted stock information, including ticker, stock symbol,
+    company name, and weight.
+    """
+    file_name = f"data/input/etf_underlyings/{ticker}.csv"
+    df = pd.read_csv(file_name)
+    return df
+
+
+def get_etf_underlyings(tickers: list[str], source: str) -> Frame:
+    """
+    Get ETF underlyings data from either external or internal source.
+
+    Parameters:
+    tickers (list[str]): List of tickers for which to extract underlying stock information.
+    source (str): Source type.
+
+    Returns:
+    Frame: DataFrame containing the extracted stock information, including ticker, stock symbol,
+    company name, and weight.
+    """
+    source_map = {
+        "external": get_etf_underlyings_external,
+        "internal": get_etf_underlyings_internal,
+    }
+    if source not in source_map:
+        raise ValueError(f"Unknown source: {source}")
+
+    print(f"Will get ETF underlying data from {source} source")
+    res = [source_map[source](ticker) for ticker in tickers]
+    res = pd.concat(res, ignore_index=True)
+    return res

@@ -16,9 +16,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from src.cli.const import CHART_PALETTE, MARK_PRICE
 from src.report.calcs import calculate_sharpe_ratio, calculate_ytd
-from src.utils.data import get_etf_underlyings, get_ticker_info
+from src.utils.data import get_ticker_info
 from src.utils.pdf import df_to_pdf, save_paragraphs_to_pdf
-from src.utils.types import DictFrame, Time
+from src.utils.types import DictFrame, Frame, Time
 
 plt.style.use("seaborn-v0_8")
 
@@ -233,7 +233,9 @@ def create_descriptions_page(tickers: list[str], output_dir: str) -> str:
     return file
 
 
-def create_overlaps_page(result_dict: DictFrame, output_dir: str) -> list[str]:
+def create_overlaps_page(
+    result_dict: DictFrame, underlyings_df: Frame, output_dir: str
+) -> list[str]:
     """
     Generate an ETF overlap heatmap based on the provided result_dict.
 
@@ -246,14 +248,9 @@ def create_overlaps_page(result_dict: DictFrame, output_dir: str) -> list[str]:
     """
     file_list = []
     for key, df in result_dict.items():
-        try:
-            underlyings = pd.concat(
-                [get_etf_underlyings(ticker) for ticker in df["ticker"].unique()]
-            )
-        except Exception as e:
-            print(f"Unable to create overlaps page due to: {e}")
-            return []
-
+        underlyings = underlyings_df[
+            underlyings_df["ticker"].isin(df["ticker"].unique())
+        ].copy()
         underlyings["Stock"] = (
             underlyings["Stock"].replace("N/A", np.nan).fillna(underlyings["Company"])
         )
@@ -599,6 +596,7 @@ def get_summary(
 
 def create_top_holdings_page(
     result_dict: DictFrame,
+    underlyings_df: Frame,
     end_date: Time,
     num_of_companies: int,
     threshold: float,
@@ -623,14 +621,9 @@ def create_top_holdings_page(
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         df = df[["ticker", "notional_value"]]
-        try:
-            underlyings = pd.concat(
-                [get_etf_underlyings(ticker) for ticker in df["ticker"].unique()]
-            )
-        except Exception as e:
-            print(f"Unable to create top holdings page due to: {e}")
-            return []
-
+        underlyings = underlyings_df[
+            underlyings_df["ticker"].isin(df["ticker"].unique())
+        ].copy()
         underlyings = underlyings.drop_duplicates(subset=["ticker", "Stock", "Company"])
         res = pd.merge(df, underlyings, on=["ticker"], how="left")
         res["Company"] = res["Company"].str.rstrip(".")

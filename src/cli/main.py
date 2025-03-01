@@ -28,7 +28,7 @@ from src.report.report import (
     plot_performance_charts,
     plot_pie_charts,
 )
-from src.utils.data import ticker_data
+from src.utils.data import get_etf_underlyings, ticker_data
 from src.utils.pdf import merge_pdfs
 from src.utils.util import parse_date
 
@@ -198,18 +198,28 @@ def report(args: Any, config: Any) -> None:
     )
     saved_pdf_files.extend(metrics)
 
+    logging.info("Getting ETF underlying data")
+    underlyings_source = config.get("HoldingsPage", "source")
+    tickers = list(set().union(*[df["ticker"] for df in res_dict.values()]))
+    underlyings = get_etf_underlyings(tickers, underlyings_source)
+
     logging.info("Getting top holdings")
     num_of_companies = config.get("HoldingsPage", "num_of_companies")
     num_of_companies = int(num_of_companies) if len(num_of_companies) > 0 else 1
     threshold = config.get("HoldingsPage", "threshold")
     threshold = float(threshold) if len(threshold) > 0 else 0.0
     holdings = create_top_holdings_page(
-        res_dict, args.end_date, num_of_companies, threshold, f"{args.path}/data/output"
+        res_dict,
+        underlyings,
+        args.end_date,
+        num_of_companies,
+        threshold,
+        f"{args.path}/data/output",
     )
     saved_pdf_files.extend(holdings)
 
     logging.info("Plotting ETF overlap heatmap")
-    overlaps = create_overlaps_page(res_dict, f"{args.path}/data/output")
+    overlaps = create_overlaps_page(res_dict, underlyings, f"{args.path}/data/output")
     saved_pdf_files.extend(overlaps)
 
     logging.info("Creating description page")

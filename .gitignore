@@ -2,6 +2,7 @@
 config/prestige_worldwide.ini
 data/input/Portfolio_Tracker.xlsx
 data/input/Prestige_Worldwide.png
+data/input/etf_underlyings/
 data/output/Prestige_Worldwide*
 __pycache__/
 .idea/
