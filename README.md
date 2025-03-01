@@ -85,6 +85,7 @@ The config settings are:
   - operator --> the operator to check against (.e.g >, <, =)
   - highlight --> colour of highlighting
 - HoldingsPage
+  - source --> whether to source the data externally, or internally. First run should always be external.
   - num_of_companies --> the number of companies to include in the top underlyings
   - threshold --> threshold for maximum % of holding in single company
 - Output
