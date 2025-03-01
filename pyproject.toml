@@ -16,6 +16,7 @@ fpdf = "^1.7.2"
 pdfrw = "^0.4"
 reportlab = "^4.0.8"
 openpyxl = "^3.1.2"
+yahooquery = "^2.3.7"
 
 
 [tool.poetry.group.dev.dependencies]

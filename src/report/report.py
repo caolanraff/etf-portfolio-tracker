@@ -15,8 +15,7 @@ from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
 from src.cli.const import CHART_PALETTE, MARK_PRICE
-from src.report.calcs import calculate_sharpe_ratio, calculate_ytd
-from src.utils.data import get_ticker_info
+from src.utils.data import get_metrics, get_ticker_info
 from src.utils.pdf import df_to_pdf, save_paragraphs_to_pdf
 from src.utils.types import DictFrame, Frame, Time
 
@@ -500,28 +499,16 @@ def create_metrics_page(
     Returns:
     list[str]: The file paths of the created PDFs.
     """
-    df_list = []
+    tickers = list(set().union(*[df["ticker"] for df in result_dict.values()]))
+    metrics = get_metrics(tickers)
 
+    df_list = []
     for key, df in result_dict.items():
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
         tickers = list(df["ticker"].unique())
-        for ticker in tickers:
-            info = get_ticker_info(ticker)
-            df = pd.DataFrame(
-                [
-                    {
-                        "Portfolio": key,
-                        "Ticker": ticker,
-                        "Sharpe Ratio": calculate_sharpe_ratio(ticker, end_date),
-                        "Beta": info.get("beta3Year", None),
-                        "Expense Ratio": None,
-                        "PE Ratio": None,
-                        "Yield": round(100 * info.get("yield", 0.0), 2),
-                        "YTD": calculate_ytd(ticker, end_date),
-                    }
-                ]
-            )
-            df_list.append(df)
+        data = metrics[metrics["Ticker"].isin(tickers)].copy()
+        data.insert(0, "Portfolio", key)
+        df_list.append(data)
 
     result_df = pd.concat(df_list, ignore_index=True)
     result_df = result_df.fillna("-")

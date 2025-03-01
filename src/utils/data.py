@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 from bs4 import BeautifulSoup
+from yahooquery import Ticker
 
 from src.report.errors import NoDataErr
 from src.utils.types import Frame
@@ -200,7 +201,59 @@ def get_etf_underlyings(tickers: list[str], source: str) -> Frame:
     if source not in source_map:
         raise ValueError(f"Unknown source: {source}")
 
-    print(f"Will get ETF underlying data from {source} source")
     res = [source_map[source](ticker) for ticker in tickers]
     res = pd.concat(res, ignore_index=True)
+    return res
+
+
+def get_metrics(tickers: list[str]) -> Frame:
+    """
+    Get ETF metrics from yahooquery.
+
+    Parameters:
+    tickers (list[str]): List of tickers for which get the metrics for.
+
+    Returns:
+    Frame: DataFrame containing the extracted metrics.
+    """
+    base = Ticker(tickers)
+
+    df_list = []
+    for i in tickers:
+        data = base.all_modules[i]
+        exp_ratio = data["fundProfile"]["feesExpensesInvestment"][
+            "annualReportExpenseRatio"
+        ]
+
+        summary = data["summaryDetail"]
+        pe_ratio = summary.get("trailingPE", 0.0)
+        div_yield = summary["yield"]
+        volume = summary["volume"]
+
+        statistics = data["defaultKeyStatistics"]
+        ytd = statistics["ytdReturn"]
+        beta = statistics["beta3Year"]
+        assets = statistics["totalAssets"]
+        avg_return = statistics["threeYearAverageReturn"]
+
+        sharpe = data["fundPerformance"]["riskOverviewStatistics"]["riskStatistics"][0][
+            "sharpeRatio"
+        ]
+
+        dict = {
+            "Ticker": i,
+            "Exp. Ratio": round(exp_ratio, 4),
+            "Div. Yield": round(100 * div_yield, 2),
+            "Sharpe Ratio": sharpe,
+            "Beta": beta,
+            "PE Ratio": round(pe_ratio, 2),
+            "Volume": volume,
+            "Assets": round(assets / 1_000_000_000, 2),
+            "YTD Return": round(100 * ytd, 2),
+            "3yr Return": round(100 * avg_return, 2),
+        }
+        df = pd.DataFrame([dict])
+        df_list.append(df)
+
+    res = pd.concat(df_list, ignore_index=True)
     return res
