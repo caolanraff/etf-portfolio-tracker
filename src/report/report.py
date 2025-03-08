@@ -15,7 +15,7 @@ from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
 from src.cli.const import CHART_PALETTE, MARK_PRICE
-from src.utils.data import get_metrics, get_ticker_info
+from src.utils.data import get_metrics, get_sector_weightings, get_ticker_info
 from src.utils.pdf import df_to_pdf, save_paragraphs_to_pdf
 from src.utils.types import DictFrame, Frame, Time
 
@@ -649,3 +649,68 @@ def create_top_holdings_page(
         files = df_to_pdf("Top Holdings", result_df, output_dir)
 
     return files
+
+
+def plot_sector_weightings_page(
+    result_dict: DictFrame, end_date: Time, output_dir: str
+) -> str:
+    """
+    Generate saves a multi-panel pie chart visualization of sector weightings for a given set of portfolios.
+
+    Parameters:
+    result_dict (DictFrame): A dictionary where keys are portfolio names and values are DataFrames containing portfolio
+        holdings.
+    end_date (Time): The date for which sector weightings are calculated.
+    output_dir (str): The directory where the generated PDF file will be saved.
+
+    Returns:
+    str: The file path of the saved sector weightings plot (PDF format).
+    """
+    tickers = list(set().union(*[df["ticker"] for df in result_dict.values()]))
+    sectors = get_sector_weightings(tickers)
+
+    n = len(result_dict)
+    num_cols = 3
+    num_rows = math.ceil(n / num_cols)
+
+    fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(15, 10))
+    if not isinstance(axs[0], np.ndarray):
+        axs = [
+            [axs[i * num_cols + j] for j in range(num_cols)] for i in range(num_rows)
+        ]
+    plt.subplots_adjust(wspace=0.3, hspace=0.5)
+
+    for i, (key, df) in enumerate(result_dict.items()):
+        df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
+        df = df[["ticker", "notional_value"]].rename(columns={"ticker": "Ticker"})
+        tickers = list(df["Ticker"].unique())
+        data = sectors[sectors["Ticker"].isin(tickers)].copy()
+
+        res = pd.merge(data, df, on="Ticker", how="left")
+        res["sector_value"] = res["Weight"] * res["notional_value"]
+        res = res.groupby("Sector")["sector_value"].sum().reset_index()
+        res["sector_weight"] = res["sector_value"] / res["sector_value"].sum()
+
+        row = i // num_cols
+        col = i % num_cols
+        axs[row][col].set_prop_cycle(color=CHART_PALETTE)
+        axs[row][col].pie(
+            res["sector_weight"].to_list(),
+            labels=res["Sector"].to_list(),
+            autopct="%1.1f%%",
+            radius=1.2,
+            textprops={"fontsize": 6},
+        )
+        axs[row][col].set_title(
+            key, y=1.1, fontdict={"fontsize": 10, "fontweight": "bold"}
+        )
+
+    for i in range(n, num_rows * num_cols):
+        row = i // num_cols
+        col = i % num_cols
+        fig.delaxes(axs[row][col])
+
+    plt.suptitle("Sector Weightings", fontsize=12, fontweight="bold")
+    file = f"{output_dir}/sectors.pdf"
+    plt.savefig(file)
+    return file

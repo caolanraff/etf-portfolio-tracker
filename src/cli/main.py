@@ -27,6 +27,7 @@ from src.report.report import (
     plot_combined_pie_chart,
     plot_performance_charts,
     plot_pie_charts,
+    plot_sector_weightings_page,
 )
 from src.utils.data import get_etf_underlyings, ticker_data
 from src.utils.pdf import merge_pdfs
@@ -217,6 +218,12 @@ def report(args: Any, config: Any) -> None:
         f"{args.path}/data/output",
     )
     saved_pdf_files.extend(holdings)
+
+    logging.info("Creating sector weightings page")
+    sectors = plot_sector_weightings_page(
+        res_dict, args.end_date, f"{args.path}/data/output"
+    )
+    saved_pdf_files.append(sectors)
 
     logging.info("Plotting ETF overlap heatmap")
     overlaps = create_overlaps_page(res_dict, underlyings, f"{args.path}/data/output")

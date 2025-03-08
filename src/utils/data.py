@@ -9,19 +9,21 @@ import json
 import re
 import sys
 from datetime import date
-from typing import Dict
+from time import sleep
+from typing import Any, Dict
 
 import pandas as pd
 import requests
+import yahooquery as yq
 import yfinance as yf
 from bs4 import BeautifulSoup
-from yahooquery import Ticker
 
 from src.report.errors import NoDataErr
 from src.utils.types import Frame
 
-ticker_data: Dict[str, pd.DataFrame] = {}
-ticker_info: Dict[str, pd.DataFrame] = {}
+ticker_data: Dict[str, Frame] = {}
+ticker_info: Dict[str, Frame] = {}
+ticker_metrics: Dict[str, Dict[str, Any]] = {}
 
 
 def get_ticker_data(ticker: str) -> Frame:
@@ -206,6 +208,36 @@ def get_etf_underlyings(tickers: list[str], source: str) -> Frame:
     return res
 
 
+def get_ticker_metrics(ticker: str, retries: int = 5, delay: int = 1) -> Frame:
+    """
+    Fetch ticker metrics with retry mechanism.
+
+    Parameters:
+    ticker (str): Stock ticker symbol.
+    retries (int): Max number of retries.
+    delay (int): Delay (in seconds) between retries.
+
+    Returns:
+    Frame: Ticker data.
+    """
+    if ticker in ticker_metrics:
+        return ticker_metrics[ticker]
+
+    for attempt in range(retries):
+        try:
+            data = yq.Ticker(ticker).all_modules[ticker]
+            if data == "Invalid Crumb":
+                sleep(delay)
+                continue
+            ticker_metrics[ticker] = data
+            return data
+        except Exception as e:
+            print(f"Error fetching data for {ticker}: {e}")
+            sleep(delay)
+
+    raise RuntimeError(f"Failed to get data for {ticker} after {retries} attempts.")
+
+
 def get_metrics(tickers: list[str]) -> Frame:
     """
     Get ETF metrics from yahooquery.
@@ -216,11 +248,9 @@ def get_metrics(tickers: list[str]) -> Frame:
     Returns:
     Frame: DataFrame containing the extracted metrics.
     """
-    base = Ticker(tickers)
-
     df_list = []
     for i in tickers:
-        data = base.all_modules[i]
+        data = get_ticker_metrics(i)
         exp_ratio = data["fundProfile"]["feesExpensesInvestment"][
             "annualReportExpenseRatio"
         ]
@@ -236,13 +266,12 @@ def get_metrics(tickers: list[str]) -> Frame:
         assets = statistics["totalAssets"]
         avg_return = statistics["threeYearAverageReturn"]
 
-        sharpe = data["fundPerformance"]["riskOverviewStatistics"]["riskStatistics"][0][
-            "sharpeRatio"
-        ]
+        statistics = data["fundPerformance"]["riskOverviewStatistics"]["riskStatistics"]
+        sharpe = statistics[0]["sharpeRatio"]
 
         dict = {
             "Ticker": i,
-            "Exp. Ratio": round(exp_ratio, 4),
+            "Exp. Ratio": round(100 * exp_ratio, 2),
             "Div. Yield": round(100 * div_yield, 2),
             "Sharpe Ratio": sharpe,
             "Beta": beta,
@@ -253,6 +282,30 @@ def get_metrics(tickers: list[str]) -> Frame:
             "3yr Return": round(100 * avg_return, 2),
         }
         df = pd.DataFrame([dict])
+        df_list.append(df)
+
+    res = pd.concat(df_list, ignore_index=True)
+    return res
+
+
+def get_sector_weightings(tickers: list[str]) -> Frame:
+    """
+    Retrieve sector weightings for a list of tickers and returns them as a DataFrame.
+
+    Parameters:
+    tickers (list[str]): A list of stock ticker symbols.
+
+    Returns:
+    Frame: A DataFrame containing sector weightings for each ticker.
+    """
+    df_list = []
+    for i in tickers:
+        data = get_ticker_metrics(i)
+        data = data["topHoldings"]["sectorWeightings"]
+        df = pd.DataFrame(
+            [(k, v) for d in data for k, v in d.items()], columns=["Sector", "Weight"]
+        )
+        df.insert(0, "Ticker", i)
         df_list.append(df)
 
     res = pd.concat(df_list, ignore_index=True)
