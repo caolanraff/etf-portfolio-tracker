@@ -107,6 +107,7 @@ def test_get_anchor_from_html() -> None:
 
 
 def test_get_etf_underlyings(mocker: Any) -> None:
+    # test external
     mock_response = mocker.Mock()
     mock_response.text = """
         etf_holdings.formatted_data = [
@@ -130,11 +131,19 @@ def test_get_etf_underlyings(mocker: Any) -> None:
     )
     assert_frame_equal(result, expected)
 
+    # test internal
+    mocker.patch("pandas.read_csv", return_value=expected)
+    result = get_etf_underlyings(["SPY"], "internal")
+    assert_frame_equal(result, expected)
+
     # test cache
     result = get_etf_underlyings(["SPY"], "external")
     assert_frame_equal(result, expected)
 
     # test exception
+    with pytest.raises(ValueError):
+        get_etf_underlyings(["VOO"], "other")
+
     mocker.patch("json.loads", side_effect=Exception("JSON decoding error"))
     with pytest.raises(NoDataErr):
         get_etf_underlyings(["VOO"], "external")

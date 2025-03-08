@@ -20,6 +20,7 @@ from src.report.report import (
     plot_combined_pie_chart,
     plot_performance_charts,
     plot_pie_charts,
+    plot_sector_weightings_page,
 )
 
 
@@ -392,3 +393,42 @@ def test_create_top_holdings_page(mocker: Any) -> None:
         result_dict, underlyings, end_date, num_of_companies, 0.0, output_dir
     )
     assert result == ["/tmp/top_holdings_1.pdf"]
+
+
+def test_plot_sector_weightings_page(mocker: Any) -> None:
+    sectors = pd.DataFrame(
+        [
+            {
+                "Ticker": ["VOO", "VOO", "VONG", "VONG"],
+                "Sector": [
+                    "Technology",
+                    "Healthcare",
+                    "Technology",
+                    "Financial Services",
+                ],
+                "Weight": [60.0, 40.0, 70.0, 30.0],
+            }
+        ]
+    )
+    mocker.patch(
+        "src.report.report.get_sector_weightings",
+        return_value=sectors,
+    )
+    mocker.patch("matplotlib.pyplot.savefig")
+
+    result_dict = {
+        "portfolio1": pd.DataFrame(
+            {
+                "date": [datetime(2023, 10, 1), datetime(2023, 10, 1)],
+                "ticker": ["VOO", "VONG"],
+                "cumulative_quantity": [10, 15],
+                "notional_value": [1500, 2000],
+            }
+        )
+    }
+    end_date = datetime(2023, 10, 1)
+    output_dir = "/tmp"
+
+    result = plot_sector_weightings_page(result_dict, end_date, output_dir)
+
+    assert result == "/tmp/sectors.pdf"
