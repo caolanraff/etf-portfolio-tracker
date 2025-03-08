@@ -24,6 +24,7 @@ This will create a PDF report (sample below) with the following pages:
   - Sharpe Ratio, Beta, Expense Ratio, PE Ratio, Yield, YTD returns
   - With optional highlighing for high/low values
 - Highest weighted underlyings
+- Sector weightings
 - ETF percentage overlaps
 - ETF Descriptions
 
