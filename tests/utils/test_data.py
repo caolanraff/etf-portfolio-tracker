@@ -119,7 +119,7 @@ def test_get_etf_underlyings(mocker: Any) -> None:
         "src.utils.data.get_ticker_info", return_value={"category": "Technology"}
     )
 
-    result = get_etf_underlyings("SPY")
+    result = get_etf_underlyings(["SPY"], "external")
     expected = pd.DataFrame(
         {
             "ticker": ["SPY", "SPY"],
@@ -131,17 +131,17 @@ def test_get_etf_underlyings(mocker: Any) -> None:
     assert_frame_equal(result, expected)
 
     # test cache
-    result = get_etf_underlyings("SPY")
+    result = get_etf_underlyings(["SPY"], "external")
     assert_frame_equal(result, expected)
 
     # test exception
     mocker.patch("json.loads", side_effect=Exception("JSON decoding error"))
     with pytest.raises(NoDataErr):
-        get_etf_underlyings("VOO")
+        get_etf_underlyings(["VOO"], "external")
 
     mocker.patch("json.loads", return_value=[["NA", "NA", "NA", "NA", "NA"]])
     with pytest.raises(NoDataErr):
-        get_etf_underlyings("VOO")
+        get_etf_underlyings(["VOO"], "external")
 
 
 def test_get_etf_underlyings_bond(mocker: Any) -> None:
@@ -155,7 +155,7 @@ def test_get_etf_underlyings_bond(mocker: Any) -> None:
     mocker.patch("requests.Session.get", return_value=mock_response)
     mocker.patch("src.utils.data.get_ticker_info", return_value={"category": " bond"})
 
-    result = get_etf_underlyings("BIV")
+    result = get_etf_underlyings(["BIV"], "external")
     expected = pd.DataFrame(
         {
             "ticker": ["BIV", "BIV"],

@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 
 from src.cli.const import MARK_PRICE
-from src.report.errors import NoDataErr
 from src.report.report import (
     create_best_and_worst_combined_page,
     create_best_and_worst_page,
@@ -160,31 +159,20 @@ def test_create_descriptions_page(mocker: Any) -> None:
 
 
 def test_create_overlaps_page(mocker: Any) -> None:
-    mocker.patch(
-        "src.report.report.get_etf_underlyings",
-        return_value=pd.DataFrame(
-            {
-                "ticker": ["ETF1", "ETF2"],
-                "Stock": ["AAPL", "GOOGL"],
-                "Company": ["Apple Inc.", "Alphabet Inc."],
-                "Weight": [0.5, 0.5],
-            }
-        ),
+    underlyings = pd.DataFrame(
+        {
+            "ticker": ["ETF1", "ETF2"],
+            "Stock": ["AAPL", "GOOGL"],
+            "Company": ["Apple Inc.", "Alphabet Inc."],
+            "Weight": [0.5, 0.5],
+        }
     )
-
     result_dict = {"Portfolio1": pd.DataFrame({"ticker": ["ETF1", "ETF2"]})}
     output_dir = "/tmp"
 
-    result = create_overlaps_page(result_dict, output_dir)
+    result = create_overlaps_page(result_dict, underlyings, output_dir)
 
     assert result == ["/tmp/heatmap_Portfolio1.pdf"]
-
-    mocker.patch(
-        "src.report.report.get_etf_underlyings",
-        side_effect=NoDataErr("Unable to get underlyings data"),
-    )
-    result = create_overlaps_page(result_dict, output_dir)
-    assert result == []
 
 
 def test_plot_performance_charts(mocker: Any) -> None:
@@ -285,12 +273,26 @@ def test_plot_pie_charts(mocker: Any) -> None:
 
 
 def test_create_metrics_page(mocker: Any) -> None:
-    mocker.patch(
-        "src.report.report.get_ticker_info",
-        return_value={"beta3Year": 1.2, "yield": 0.03},
+    metrics = pd.DataFrame(
+        [
+            {
+                "Ticker": "ETF1",
+                "Exp. Ratio": 0.01,
+                "Div. Yield": 0.79,
+                "Sharpe Ratio": 1.2,
+                "Beta": 1.1,
+                "PE Ratio": 25,
+                "Volume": 100000,
+                "Assets": 1000000,
+                "YTD Return": 5.0,
+                "3yr Return": 15.0,
+            }
+        ]
     )
-    mocker.patch("src.report.report.calculate_sharpe_ratio", return_value=1.5)
-    mocker.patch("src.report.report.calculate_ytd", return_value=10.0)
+    mocker.patch(
+        "src.report.report.get_metrics",
+        return_value=metrics,
+    )
     mocker.patch(
         "src.report.report.df_to_pdf", return_value=["/path/to/pdf1", "/path/to/pdf2"]
     )
@@ -356,15 +358,6 @@ def test_get_summary(mocker: Any) -> None:
 
 
 def test_create_top_holdings_page(mocker: Any) -> None:
-    mock_data = pd.DataFrame(
-        {
-            "ticker": ["AAPL", "GOOGL"],
-            "Stock": ["AAPL", "GOOGL"],
-            "Company": ["Apple Inc.", "Alphabet Inc."],
-            "Weight": [50.0, 50.0],
-        }
-    )
-    mocker.patch("src.report.report.get_etf_underlyings", return_value=mock_data)
     mocker.patch("src.utils.pdf.df_to_pdf", return_value=["/path/to/pdf1.pdf"])
 
     result_dict = {
@@ -377,26 +370,25 @@ def test_create_top_holdings_page(mocker: Any) -> None:
             }
         )
     }
+    underlyings = pd.DataFrame(
+        {
+            "ticker": ["AAPL", "GOOGL"],
+            "Stock": ["AAPL", "GOOGL"],
+            "Company": ["Apple Inc.", "Alphabet Inc."],
+            "Weight": [50.0, 50.0],
+        }
+    )
     end_date = pd.Timestamp("2023-10-01")
     num_of_companies = 1
     threshold = 10.0
     output_dir = "/tmp"
 
     result = create_top_holdings_page(
-        result_dict, end_date, num_of_companies, threshold, output_dir
+        result_dict, underlyings, end_date, num_of_companies, threshold, output_dir
     )
     assert result == ["/tmp/top_holdings_1.pdf"]
 
     result = create_top_holdings_page(
-        result_dict, end_date, num_of_companies, 0.0, output_dir
+        result_dict, underlyings, end_date, num_of_companies, 0.0, output_dir
     )
     assert result == ["/tmp/top_holdings_1.pdf"]
-
-    mocker.patch(
-        "src.report.report.get_etf_underlyings",
-        side_effect=NoDataErr("Unable to get underlyings data"),
-    )
-    result = create_top_holdings_page(
-        result_dict, end_date, num_of_companies, 0.0, output_dir
-    )
-    assert result == []
