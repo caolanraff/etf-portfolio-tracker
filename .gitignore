@@ -6,4 +6,3 @@ data/input/etf_underlyings/*.csv
 data/output/Prestige_Worldwide*
 __pycache__/
 .idea/
-notes.txt

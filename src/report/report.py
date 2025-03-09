@@ -223,10 +223,9 @@ def create_descriptions_page(tickers: list[str], output_dir: str) -> str:
 
     for i in tickers:
         data = get_ticker_info(i)
-        if "longBusinessSummary" in data:
-            name = data["shortName"]
-            headers += [f"{name} ({i})"]
-            paragraphs += [data["longBusinessSummary"]]
+        name = data["name"]
+        headers += [f"{name} ({i})"]
+        paragraphs += [data["description"]]
 
     file = save_paragraphs_to_pdf("ETF Descriptions", headers, paragraphs, output_dir)
     return file

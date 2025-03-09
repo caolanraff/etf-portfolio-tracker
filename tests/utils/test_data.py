@@ -16,7 +16,6 @@ from src.utils.data import (
     get_ticker_metrics,
     get_title_from_html,
     ticker_data,
-    ticker_info,
 )
 
 
@@ -64,25 +63,6 @@ class TickerInfoTestObject:
     @property
     def info(self) -> Dict[str, str]:
         return {"symbol": "AAPL", "name": "Apple Inc."}
-
-
-def test_get_ticker_info(mocker: Any) -> None:
-    mocker.patch("yfinance.Ticker", return_value=TickerInfoTestObject())
-
-    result = get_ticker_info("AAPL")
-    expected = {"symbol": "AAPL", "name": "Apple Inc."}
-
-    assert "AAPL" in ticker_info
-    assert result == expected
-
-    # test cache
-    result = get_ticker_info("AAPL")
-    assert result == expected
-
-    # test yfinance failure
-    mocker.patch("yfinance.Ticker", side_effect=Exception("Custom Error Message"))
-    with pytest.raises(SystemExit):
-        get_ticker_info("ABC")
 
 
 def test_get_title_from_html() -> None:
@@ -269,3 +249,21 @@ def test_get_sector_weightings(mocker: Any) -> None:
     expected.insert(0, "Ticker", "VOO")
 
     assert_frame_equal(result, expected)
+
+
+def test_get_ticker_info(mocker: Any) -> None:
+    metrics = {
+        "price": {"shortName": "S&P 500"},
+        "fundProfile": {"categoryName": "Index Fund"},
+        "summaryProfile": {"longBusinessSummary": "S&P 500 index fund."},
+    }
+    mocker.patch("src.utils.data.get_ticker_metrics", return_value=metrics)
+
+    result = get_ticker_info("VOO")
+    expected = {
+        "name": "S&P 500",
+        "category": "Index Fund",
+        "description": "S&P 500 index fund.",
+    }
+
+    assert result == expected

@@ -141,8 +141,8 @@ def test_create_descriptions_page(mocker: Any) -> None:
     )
 
     mock_get_ticker_info.side_effect = lambda ticker: {
-        "shortName": f"Name {ticker}",
-        "longBusinessSummary": f"Summary {ticker}",
+        "name": f"Name {ticker}",
+        "description": f"Summary {ticker}",
     }
     mock_save_paragraphs_to_pdf.return_value = "/fake/dir/etf_descriptions.pdf"
 

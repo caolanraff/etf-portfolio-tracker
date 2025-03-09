@@ -22,7 +22,6 @@ from src.report.errors import NoDataErr
 from src.utils.types import Frame
 
 ticker_data: Dict[str, Frame] = {}
-ticker_info: Dict[str, Frame] = {}
 ticker_metrics: Dict[str, Dict[str, Any]] = {}
 
 
@@ -53,29 +52,6 @@ def get_ticker_data(ticker: str) -> Frame:
     data = data.reindex(pd.date_range(min(list(data.index)), date.today(), freq="D"))
     data = data.ffill()
     ticker_data[ticker] = data
-    return data
-
-
-def get_ticker_info(ticker: str) -> Frame:
-    """
-    Retrieve info data for a given ticker symbol.
-
-    Parameters:
-    ticker (str): Ticker symbol for the desired ETF.
-
-    Returns:
-    Frame: DataFrame containing the data info for the specified ticker.
-    """
-    if ticker in ticker_info.keys():
-        return ticker_info[ticker]
-
-    try:
-        data = yf.Ticker(ticker).info
-    except Exception as e:
-        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
-        sys.exit()
-
-    ticker_info[ticker] = data
     return data
 
 
@@ -308,4 +284,22 @@ def get_sector_weightings(tickers: list[str]) -> Frame:
         df_list.append(df)
 
     res = pd.concat(df_list, ignore_index=True)
+    return res
+
+
+def get_ticker_info(ticker: str) -> dict[str, str]:
+    """
+    Retrieve info data for a given ticker symbol.
+
+    Parameters:
+    ticker (str): Ticker symbol for the desired ETF.
+
+    Returns:
+    dict: Dictionary containing ticker name and description.
+    """
+    data = get_ticker_metrics(ticker)
+    name = data["price"]["shortName"]
+    category = data["fundProfile"]["categoryName"]
+    description = data["summaryProfile"].get("longBusinessSummary", "NA")
+    res = {"name": name, "category": category, "description": description}
     return res
