@@ -232,8 +232,7 @@ def get_ticker_metrics(ticker: str, retries: int = 5, delay: int = 1) -> Frame:
             ticker_metrics[ticker] = data
             return data
         except Exception as e:
-            print(f"Error fetching data for {ticker}: {e}")
-            sleep(delay)
+            raise NoDataErr(f"Error fetching data for {ticker}: {e}")
 
     raise RuntimeError(f"Failed to get data for {ticker} after {retries} attempts.")
 

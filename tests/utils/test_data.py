@@ -11,6 +11,7 @@ from src.utils.data import (
     get_etf_underlyings,
     get_ticker_data,
     get_ticker_info,
+    get_ticker_metrics,
     get_title_from_html,
     ticker_data,
     ticker_info,
@@ -57,14 +58,14 @@ def test_get_ticker_data(mocker: Any) -> None:
         get_ticker_data("DEF")
 
 
-class TestObject:
+class TickerInfoTestObject:
     @property
     def info(self) -> Dict[str, str]:
         return {"symbol": "AAPL", "name": "Apple Inc."}
 
 
 def test_get_ticker_info(mocker: Any) -> None:
-    mocker.patch("yfinance.Ticker", return_value=TestObject())
+    mocker.patch("yfinance.Ticker", return_value=TickerInfoTestObject())
 
     result = get_ticker_info("AAPL")
     expected = {"symbol": "AAPL", "name": "Apple Inc."}
@@ -174,3 +175,36 @@ def test_get_etf_underlyings_bond(mocker: Any) -> None:
         }
     )
     assert_frame_equal(result, expected)
+
+
+class TickerTestObject:
+    @property
+    def all_modules(self) -> Any:
+        return {"VOO": {"assetProfile": {"longBusinessSummary": "fund"}}}
+
+
+class TickerTestObjectErr:
+    @property
+    def all_modules(self) -> Any:
+        return {"ABC": "Invalid Crumb"}
+
+
+def test_get_ticker_metrics(mocker: Any) -> None:
+    mocker.patch("yahooquery.Ticker", return_value=TickerTestObject())
+
+    result = get_ticker_metrics("VOO")
+    expected = TickerTestObject().all_modules["VOO"]
+    assert result == expected
+
+    # test cache
+    result = get_ticker_metrics("VOO")
+    assert result == expected
+
+    # test failure
+    mocker.patch("yahooquery.Ticker", return_value=TickerTestObjectErr())
+    with pytest.raises(RuntimeError):
+        get_ticker_metrics("ABC", 2, 0)
+
+    mocker.patch("yahooquery.Ticker", side_effect=Exception("Custom Error Message"))
+    with pytest.raises(NoDataErr):
+        get_ticker_metrics("ABC")

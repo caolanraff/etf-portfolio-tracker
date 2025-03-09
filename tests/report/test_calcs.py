@@ -136,13 +136,13 @@ def test_calculate_portfolio_pnl(mocker: Any) -> None:
 
 def test_calculate_sharpe_ratio(mocker: Any) -> None:
     mock_data = pd.DataFrame(
-        {"Close": [5, 6, 8, 10, 1]},
+        {"Close": [5, 6, 8, 10, 3]},
         index=pd.date_range(start="2024-01-01", periods=5),
     )
-    mocker.patch("src.utils.data.get_ticker_data", return_value=mock_data)
+    mocker.patch("src.report.calcs.get_ticker_data", return_value=mock_data)
 
     result = calculate_sharpe_ratio("SPY", datetime(2024, 1, 6))
-    expected = 0.64
+    expected = 0.63
 
     assert result == expected
 
@@ -150,14 +150,14 @@ def test_calculate_sharpe_ratio(mocker: Any) -> None:
 def test_calculate_ytd(mocker: Any) -> None:
     mock_data = pd.DataFrame(
         {
-            "Close": [100, 110, 120],
+            "Close": [100, 110, 103.5],
             "Date": pd.date_range(start="2023-01-01", periods=3),
         }
     ).set_index("Date")
-    mocker.patch("src.utils.data.get_ticker_data", return_value=mock_data)
+    mocker.patch("src.report.calcs.get_ticker_data", return_value=mock_data)
 
     result = calculate_ytd("AAPL", datetime(2023, 1, 3))
-    expected = -3.74
+    expected = 3.5
 
     assert result == expected
 
