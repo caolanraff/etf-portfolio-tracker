@@ -232,17 +232,19 @@ def get_metrics(tickers: list[str]) -> Frame:
 
         summary = data["summaryDetail"]
         pe_ratio = summary.get("trailingPE", 0.0)
-        div_yield = summary["yield"]
+        div_yield = summary.get("yield", 0.0)
         volume = summary["volume"]
 
         statistics = data["defaultKeyStatistics"]
-        ytd = statistics["ytdReturn"]
-        beta = statistics["beta3Year"]
+        ytd = statistics.get("ytdReturn", 0.0)
+        beta = statistics.get("beta3Year", 0.0)
         assets = statistics["totalAssets"]
-        avg_return = statistics["threeYearAverageReturn"]
+        avg_return = statistics.get("threeYearAverageReturn", 0.0)
 
         statistics = data["fundPerformance"]["riskOverviewStatistics"]["riskStatistics"]
-        sharpe = statistics[0]["sharpeRatio"]
+        sharpe = 0.0
+        if len(statistics) > 0:
+            sharpe = statistics[0]["sharpeRatio"]
 
         dict = {
             "Ticker": i,

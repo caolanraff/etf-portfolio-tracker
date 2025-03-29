@@ -249,6 +249,8 @@ def create_overlaps_page(
         underlyings = underlyings_df[
             underlyings_df["ticker"].isin(df["ticker"].unique())
         ].copy()
+        if underlyings.empty:
+            continue
         underlyings["Stock"] = (
             underlyings["Stock"].replace("N/A", np.nan).fillna(underlyings["Company"])
         )
@@ -611,6 +613,8 @@ def create_top_holdings_page(
             underlyings_df["ticker"].isin(df["ticker"].unique())
         ].copy()
         underlyings = underlyings.drop_duplicates(subset=["ticker", "Stock", "Company"])
+        if underlyings.empty:
+            continue
         res = pd.merge(df, underlyings, on=["ticker"], how="left")
         res["Company"] = res["Company"].str.rstrip(".")
         res["symbol_notional"] = res["notional_value"] * (res["Weight"] / 100)
