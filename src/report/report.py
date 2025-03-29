@@ -612,9 +612,9 @@ def create_top_holdings_page(
         underlyings = underlyings_df[
             underlyings_df["ticker"].isin(df["ticker"].unique())
         ].copy()
-        underlyings = underlyings.drop_duplicates(subset=["ticker", "Stock", "Company"])
         if underlyings.empty:
             continue
+        underlyings = underlyings.drop_duplicates(subset=["ticker", "Stock", "Company"])
         res = pd.merge(df, underlyings, on=["ticker"], how="left")
         res["Company"] = res["Company"].str.rstrip(".")
         res["symbol_notional"] = res["notional_value"] * (res["Weight"] / 100)
