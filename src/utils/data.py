@@ -6,6 +6,7 @@ Date: 2023-07-02
 """
 
 import json
+import os
 import re
 import sys
 from datetime import date
@@ -156,6 +157,9 @@ def get_etf_underlyings_internal(ticker: str) -> Frame:
     company name, and weight.
     """
     file_name = f"data/input/etf_underlyings/{ticker}.csv"
+    if not os.path.exists(file_name):
+        print(f"File not found: {file_name}")
+        return pd.DataFrame()
     df = pd.read_csv(file_name)
     return df
 
