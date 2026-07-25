@@ -6,6 +6,7 @@ This script tracks and analyses multiple ETF portfolios, given an Excel file wit
 Author: Caolan Rafferty
 Date: 2023-07-02
 """
+
 import argparse
 import configparser
 import logging
@@ -93,7 +94,14 @@ def summary(args: Any, config: Any) -> None:
         "worst": config.get("SummaryPage", "worst"),
     }
     get_summary(res_dict, args.start_date, args.end_date, args.timeframe, comments)
-    plot_performance_charts(args, res_dict)
+
+    logging.info("Getting best and worst ETFs")
+    create_best_and_worst_page(res_dict, args.end_date)
+
+    logging.info("Getting best and worst combined ETFs")
+    create_best_and_worst_combined_page(
+        res_dict, ticker_data, args.start_date, args.end_date, 15, ""
+    )
 
     logging.info("Complete")
 
@@ -167,6 +175,7 @@ def report(args: Any, config: Any) -> None:
         ticker_data,
         args.start_date,
         args.end_date,
+        5,
         f"{args.path}/data/output",
     )
     saved_pdf_files.extend(best_and_worst_comb)

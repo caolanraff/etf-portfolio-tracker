@@ -5,6 +5,7 @@ Author: Caolan Rafferty
 Date: 2023-07-02
 """
 
+import io
 import json
 import os
 import re
@@ -18,12 +19,48 @@ import requests
 import yahooquery as yq
 import yfinance as yf
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 
 from src.report.errors import NoDataErr
 from src.utils.types import Frame
 
+load_dotenv()
 ticker_data: Dict[str, Frame] = {}
 ticker_metrics: Dict[str, Dict[str, Any]] = {}
+
+TIINGO_TOKEN = os.environ.get("TIINGO_TOKEN")
+TIINGO_TICKERS = {"SPLG"}
+
+
+def _fetch_tiingo(ticker: str) -> pd.DataFrame:
+    """Fetch daily adjusted prices from Tiingo."""
+    url = f"https://api.tiingo.com/tiingo/daily/{ticker}/prices"
+    r = requests.get(
+        url,
+        params={"startDate": "2000-01-01", "format": "csv"},
+        headers={"Authorization": f"Token {TIINGO_TOKEN}"},
+        timeout=15,
+    )
+    r.raise_for_status()
+
+    df = (
+        pd.read_csv(io.StringIO(r.text), parse_dates=["date"])
+        .set_index("date")
+        .sort_index()
+    )
+    # Rename adjusted columns to match yfinance auto_adjust=True schema
+    df = df.rename(
+        columns={
+            "adjOpen": "Open",
+            "adjHigh": "High",
+            "adjLow": "Low",
+            "adjClose": "Close",
+            "adjVolume": "Volume",
+        }
+    )
+    df = df[["Open", "High", "Low", "Close", "Volume"]]
+    df.index = pd.to_datetime(df.index).date
+    return df
 
 
 def get_ticker_data(ticker: str) -> Frame:
@@ -39,17 +76,22 @@ def get_ticker_data(ticker: str) -> Frame:
     if ticker in ticker_data.keys():
         return ticker_data[ticker]
 
-    try:
-        data = yf.download(ticker, progress=False, auto_adjust=True)
-        if not len(data):
-            print(f"No data from Yahoo finance for {ticker}")
+    if ticker in TIINGO_TICKERS:
+        print(f"Fetching data from tiingo for {ticker}")
+        data = _fetch_tiingo(ticker)
+    else:
+        try:
+            data = yf.download(ticker, progress=False, auto_adjust=True)
+            if not len(data):
+                print(f"No data from Yahoo finance for {ticker}")
+                sys.exit()
+        except Exception as e:
+            print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
             sys.exit()
-    except Exception as e:
-        print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
-        sys.exit()
 
-    data.columns = data.columns.droplevel(1)
-    data.index = pd.to_datetime(data.index).date
+        data.columns = data.columns.droplevel(1)
+        data.index = pd.to_datetime(data.index).date
+
     data = data.reindex(pd.date_range(min(list(data.index)), date.today(), freq="D"))
     data = data.ffill()
     ticker_data[ticker] = data
@@ -242,7 +284,6 @@ def get_metrics(tickers: list[str]) -> Frame:
         statistics = data["defaultKeyStatistics"]
         ytd = statistics.get("ytdReturn", 0.0)
         beta = statistics.get("beta3Year", 0.0)
-        assets = statistics["totalAssets"]
         avg_return = statistics.get("threeYearAverageReturn", 0.0)
 
         statistics = data["fundPerformance"]["riskOverviewStatistics"]["riskStatistics"]
@@ -258,7 +299,6 @@ def get_metrics(tickers: list[str]) -> Frame:
             "Beta": beta,
             "PE Ratio": round(pe_ratio, 2),
             "Volume": volume,
-            "Assets": round(assets / 1_000_000_000, 2),
             "YTD Return": round(100 * ytd, 2),
             "3yr Return": round(100 * avg_return, 2),
         }

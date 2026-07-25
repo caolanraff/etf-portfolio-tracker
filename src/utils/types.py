@@ -1,4 +1,5 @@
 """Type definitions."""
+
 from datetime import date, datetime
 from typing import Dict
 
@@ -9,4 +10,4 @@ from typing_extensions import TypeAlias
 DictFrame = Dict[str, pd.DataFrame]
 Frame: TypeAlias = pd.DataFrame
 Series: TypeAlias = pd.Series
-Time: TypeAlias = date | datetime | pd.Timestamp | np.datetime64  # type: ignore
+Time: TypeAlias = date | datetime | pd.Timestamp | np.datetime64

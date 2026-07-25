@@ -4,6 +4,7 @@ Functions required to generate report.
 Author: Caolan Rafferty
 Date: 2024-09-06
 """
+
 import math
 from typing import Any
 
@@ -85,7 +86,7 @@ def create_new_trades_page(result_dict: DictFrame, output_dir: str) -> list[str]
 
 
 def create_best_and_worst_page(
-    result_dict: DictFrame, end_date: Time, output_dir: str
+    result_dict: DictFrame, end_date: Time, output_dir: str = ""
 ) -> list[str]:
     """
     Compute the best and worst performers among the ETFs in the result dictionary and saves the results as a PDF report.
@@ -147,8 +148,12 @@ def create_best_and_worst_page(
 
         result_df = pd.concat([result_df, summary], ignore_index=True)
 
-    files = df_to_pdf("Best & Worst Performers", result_df, output_dir)
-    return files
+    if output_dir != "":
+        files = df_to_pdf("Best & Worst Performers", result_df, output_dir)
+        return files
+    else:
+        print(result_df)
+        return []
 
 
 def create_best_and_worst_combined_page(
@@ -156,7 +161,8 @@ def create_best_and_worst_combined_page(
     ticker_data: DictFrame,
     start_date: Time,
     end_date: Time,
-    output_dir: str,
+    num: int,
+    output_dir: str = "",
 ) -> list[str]:
     """
     Combine the best and worst performing ETFs based on their returns.
@@ -176,7 +182,7 @@ def create_best_and_worst_combined_page(
     tickers = []
 
     for key, df in ticker_data.items():
-        df = df.loc[start_date:end_date]
+        df = df.loc[start_date:end_date]  # type: ignore[misc]
         first_close = df[MARK_PRICE].iloc[0]
         last_close = df[MARK_PRICE].iloc[-1]
         percentage_change = (last_close - first_close) / first_close * 100
@@ -191,20 +197,24 @@ def create_best_and_worst_combined_page(
 
     returns = returns.loc[returns["Ticker"].isin(tickers)]
     top = returns.sort_values(by="Returns", ascending=False)
-    top = top.head(5)
+    top = top.head(num)
     top.reset_index(drop=True, inplace=True)
-    result_df["Top 5 ETFs"] = top.apply(
+    result_df[f"Top {num} ETFs"] = top.apply(
         lambda row: f"{row['Ticker']} ({row['Returns']}%)", axis=1
     )
     bottom = returns.sort_values(by="Returns", ascending=True)
-    bottom = bottom.head(5)
+    bottom = bottom.head(num)
     bottom.reset_index(drop=True, inplace=True)
-    result_df["Bottom 5 ETFs"] = bottom.apply(
+    result_df[f"Bottom {num} ETFs"] = bottom.apply(
         lambda row: f"{row['Ticker']} ({row['Returns']}%)", axis=1
     )
 
-    files = df_to_pdf("Best & Worst Performers Combined", result_df, output_dir)
-    return files
+    if output_dir != "":
+        files = df_to_pdf("Best & Worst Performers Combined", result_df, output_dir)
+        return files
+    else:
+        print(result_df)
+        return []
 
 
 def create_descriptions_page(tickers: list[str], output_dir: str) -> str:
@@ -305,7 +315,7 @@ def get_aum(result_dict: DictFrame, end_date: Time) -> str:
         res = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)].iloc[0]
         portfolio_val += [res["portfolio_value"]]
 
-    aum = f"${sum(portfolio_val):,.0f}"
+    aum = f"${sum(portfolio_val): ,.0f}"
     return aum
 
 

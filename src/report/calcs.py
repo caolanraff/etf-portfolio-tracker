@@ -4,6 +4,7 @@ Calculations required for report generation.
 Author: Caolan Rafferty
 Date: 2024-09-06
 """
+
 from datetime import timedelta
 from typing import Any
 
@@ -139,8 +140,20 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
 
     # Merge the price data onto the original dataframe
     result_df["market_price"] = result_df.apply(
-        lambda row: prices[row["ticker"]].loc[pd.Timestamp(row["date"])], axis=1
+        lambda row: prices[row["ticker"]].asof(pd.Timestamp(row["date"])), axis=1
     )
+
+    # Guard: fail loudly if any held position has a missing price
+    held = result_df["cumulative_quantity"] != 0
+    missing = result_df[held & result_df["market_price"].isna()]
+    if not missing.empty:
+        summary = (
+            missing.groupby("ticker")["date"]
+            .agg(first_missing="min", last_missing="max", days="count")
+            .to_string()
+        )
+        print(f"Missing market price for positions: \n{summary}")
+
     # Calculate the notional value based on the market price
     result_df["notional_value"] = (
         result_df["cumulative_quantity"] * result_df["market_price"]
@@ -216,7 +229,7 @@ def calculate_all_portfolio_pnl(
     # add benchmark portfolio
     if benchmark != "":
         data = get_ticker_data(benchmark)
-        data = data.loc[start_date:end_date][MARK_PRICE]
+        data = data.loc[start_date:end_date][MARK_PRICE]  # type: ignore[misc]
         benchmark_df = pd.DataFrame(
             {
                 "date": data.index,
@@ -244,7 +257,7 @@ def calculate_sharpe_ratio(ticker: str, end_date: Time) -> float:
     """
     data = get_ticker_data(ticker)
     min_date = end_date - timedelta(days=5 * 365)
-    data = data.loc[min_date:end_date]
+    data = data.loc[min_date:end_date]  # type: ignore[misc]
     pct_chg = data[MARK_PRICE].pct_change()
     sharpe = qs.stats.sharpe(pct_chg).round(2)
     return float(sharpe)
@@ -263,7 +276,7 @@ def calculate_ytd(ticker: str, end_date: Time) -> Any:
     """
     data = get_ticker_data(ticker)
     min_date = pd.to_datetime(end_date.year, format="%Y")
-    data = data.loc[min_date:end_date]
+    data = data.loc[min_date:end_date]  # type: ignore[misc]
     start = data.head(1)[MARK_PRICE].iloc[0]
     end = data.tail(1)[MARK_PRICE].iloc[0]
     ytd = ((end - start) / start) * 100

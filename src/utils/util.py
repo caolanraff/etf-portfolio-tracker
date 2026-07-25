@@ -1,4 +1,5 @@
 """Utility functions."""
+
 from datetime import datetime
 
 from src.utils.types import Time
