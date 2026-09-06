@@ -77,6 +77,14 @@ def main() -> None:
             print("  (no open positions)")
         else:
             print(res.to_string(float_format=lambda x: f"{x:,.4f}"))
+            missing = res[res["avg_price"].isna()]
+            if not missing.empty:
+                tickers = ", ".join(missing.index)
+                print(
+                    f"  (excluding {tickers} from total cost basis - no avg price available)"
+                )
+            total_cost_basis = (res["position"] * res["avg_price"]).sum()
+            print(f"Total cost basis: ${total_cost_basis:,.2f}")
         print()
 
 

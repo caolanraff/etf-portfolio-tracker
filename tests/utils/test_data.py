@@ -184,7 +184,7 @@ def test_get_ticker_metrics(mocker: Any) -> None:
 
     # test failure
     mocker.patch("yahooquery.Ticker", return_value=TickerTestObjectErr())
-    with pytest.raises(RuntimeError):
+    with pytest.raises(NoDataErr):
         get_ticker_metrics("ABC", 2, 0)
 
     mocker.patch("yahooquery.Ticker", side_effect=Exception("Custom Error Message"))

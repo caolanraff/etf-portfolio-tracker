@@ -12,7 +12,7 @@ import re
 import sys
 from datetime import date
 from time import sleep
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import requests
@@ -245,18 +245,23 @@ def get_ticker_metrics(ticker: str, retries: int = 5, delay: int = 1) -> Frame:
     if ticker in ticker_metrics:
         return ticker_metrics[ticker]
 
+    last_error: Optional[BaseException] = None
     for attempt in range(retries):
         try:
             data = yq.Ticker(ticker).all_modules[ticker]
             if data == "Invalid Crumb":
+                last_error = NoDataErr("Invalid Crumb")
                 sleep(delay)
                 continue
             ticker_metrics[ticker] = data
             return data
         except Exception as e:
-            raise NoDataErr(f"Error fetching data for {ticker}: {e}")
+            last_error = e
+            sleep(delay)
 
-    raise RuntimeError(f"Failed to get data for {ticker} after {retries} attempts.")
+    raise NoDataErr(
+        f"Failed to get data for {ticker} after {retries} attempts: {last_error}"
+    )
 
 
 def get_metrics(tickers: list[str]) -> Frame:
