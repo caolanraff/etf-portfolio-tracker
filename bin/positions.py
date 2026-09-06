@@ -1,8 +1,8 @@
 """
 ETF Position & Average Price Calculator.
 
-Loads a trades Excel file and prints the current net position and
-weighted-average entry price for each ETF, per portfolio.
+Loads a trades Excel file and prints the current net position, weighted-average
+entry price, and current market value for each ETF, per portfolio.
 """
 
 import argparse
@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.cli.const import STOCK_SPLITS
+from src.cli.const import MARK_PRICE, STOCK_SPLITS
+from src.utils.data import get_ticker_data
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -55,6 +56,16 @@ def positions_for_trades(trades: pd.DataFrame) -> pd.DataFrame:
     return result.sort_index()
 
 
+def add_market_values(res: pd.DataFrame) -> pd.DataFrame:
+    """Fetch the latest market price for each ticker and add a market value column."""
+    res = res.copy()
+    res["market_price"] = [
+        get_ticker_data(ticker)[MARK_PRICE].iloc[-1] for ticker in res.index
+    ]
+    res["market_value"] = res["position"] * res["market_price"]
+    return res
+
+
 def main() -> None:
     """Print open positions for each portfolio sheet in a trades Excel file."""
     parser = argparse.ArgumentParser()
@@ -76,15 +87,16 @@ def main() -> None:
         if res.empty:
             print("  (no open positions)")
         else:
-            print(res.to_string(float_format=lambda x: f"{x:,.4f}"))
-            missing = res[res["avg_price"].isna()]
+            res = add_market_values(res)
+            print(res.to_string(float_format=lambda x: f"{x:,.2f}"))
+            missing = res[res["market_price"].isna()]
             if not missing.empty:
                 tickers = ", ".join(missing.index)
                 print(
-                    f"  (excluding {tickers} from total cost basis - no avg price available)"
+                    f"  (excluding {tickers} from total market value - no market price available)"
                 )
-            total_cost_basis = (res["position"] * res["avg_price"]).sum()
-            print(f"Total cost basis: ${total_cost_basis:,.2f}")
+            total_market_value = res["market_value"].sum()
+            print(f"Total market value: ${total_market_value:,.2f}")
         print()
 
 
