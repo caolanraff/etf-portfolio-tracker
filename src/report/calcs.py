@@ -93,6 +93,13 @@ def process_stock_splits(df: Frame, stock_splits: Frame) -> Frame:
     return df
 
 
+def _weighted_avg_price(prices: pd.Series, quantities: pd.Series) -> float:
+    """Quantity-weighted average price, falling back to a simple mean when quantities net to zero."""
+    if quantities.sum() == 0:
+        return float(prices.mean())
+    return float(np.average(prices, weights=quantities))
+
+
 def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
     """
     Calculate the profit and loss (PnL) for a specific portfolio.
@@ -111,7 +118,7 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
         .agg(
             {
                 "quantity": "sum",
-                "price": lambda x: np.average(x, weights=df.loc[x.index, "quantity"]),
+                "price": lambda x: _weighted_avg_price(x, df.loc[x.index, "quantity"]),
             }
         )
         .reset_index()

@@ -7,3 +7,4 @@ data/output/Prestige_Worldwide*
 __pycache__/
 .idea/
 .env
+.claude/

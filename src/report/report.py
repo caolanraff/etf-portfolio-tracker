@@ -583,7 +583,8 @@ def get_summary(
 
     if comments is not None:
         summary.loc[0, "Notes"] = comments.get("best", "")
-        summary.loc[summary.index[-1], "Notes"] = comments.get("worst", "")
+        if len(summary) > 1:
+            summary.loc[summary.index[-1], "Notes"] = comments.get("worst", "")
 
     if output_dir != "":
         files = df_to_pdf("Summary", summary, output_dir)
