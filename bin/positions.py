@@ -88,7 +88,7 @@ def main() -> None:
             print("  (no open positions)")
         else:
             res = add_market_values(res)
-            print(res.to_string(float_format=lambda x: f"{x:,.4f}"))
+            print(res.to_string(float_format=lambda x: f"{x:,.2f}"))
             missing = res[res["market_price"].isna()]
             if not missing.empty:
                 tickers = ", ".join(missing.index)
