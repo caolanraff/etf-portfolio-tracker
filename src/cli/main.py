@@ -157,10 +157,6 @@ def report(args: Any, config: Any) -> None:
     perf_charts = plot_performance_charts(args, res_dict, f"{args.path}/data/output")
     sections.append(("Performance Charts", [perf_charts]))
 
-    logging.info("Getting portfolio risk metrics")
-    risk_metrics = create_risk_metrics_page(res_dict, f"{args.path}/data/output")
-    sections.append(("Risk Metrics", risk_metrics))
-
     # Don't need the brenchmark for the rest of the analysis
     res_dict.pop("Benchmark", None)
 
@@ -212,6 +208,10 @@ def report(args: Any, config: Any) -> None:
         f"{args.path}/data/output",
     )
     sections.append(("Metrics", metrics))
+
+    logging.info("Getting portfolio risk metrics")
+    risk_metrics = create_risk_metrics_page(res_dict, f"{args.path}/data/output")
+    sections.append(("Risk Metrics", risk_metrics))
 
     logging.info("Getting ETF underlying data")
     underlyings_source = config.get("HoldingsPage", "source")
