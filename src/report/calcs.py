@@ -229,7 +229,10 @@ def calculate_all_portfolio_pnl(
         res = calculate_portfolio_pnl(data, end_date)
         res = res[(res["date"] >= start_date) & (res["date"] <= end_date)]
         group = res.groupby("ticker")["cumulative_quantity"].sum()
-        tickers = group[group == 0].index
+        # Use a tolerance instead of exact equality: summing many non-exact decimal
+        # trade quantities over time leaves a tiny (~1e-14) floating-point residue
+        # even for genuinely closed-out positions.
+        tickers = group[np.isclose(group, 0, atol=1e-6)].index
         res = res[~res["ticker"].isin(tickers)]
         result_dict[sheet] = res
 

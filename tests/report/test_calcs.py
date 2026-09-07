@@ -200,6 +200,34 @@ def test_calculate_all_portfolio_pnl(mocker: Any) -> None:
     assert_frame_equal(result["Portfolio2"], mock_data2)
 
 
+def test_calculate_all_portfolio_pnl_drops_near_zero_position(mocker: Any) -> None:
+    # A closed-out position can sum to a tiny floating-point residue (e.g. 7.1e-15)
+    # instead of exactly 0, from summing many non-exact decimal trade quantities.
+    # It should still be dropped, not kept around as a phantom position.
+    mock_excel = mocker.patch("pandas.ExcelFile")
+    mock_read_excel = mocker.patch("pandas.read_excel")
+
+    mock_excel.return_value.sheet_names = ["Portfolio1"]
+    mock_data = pd.DataFrame(
+        {
+            "date": ["2023-01-01", "2023-01-01", "2023-01-02", "2023-01-02"],
+            "ticker": ["AAPL", "GHOST", "AAPL", "GHOST"],
+            "quantity": [10, 0.1, 5, -0.1],
+        }
+    )
+    mock_read_excel.side_effect = [mock_data]
+
+    pnl_data = mock_data.copy()
+    pnl_data["cumulative_quantity"] = [10.0, 7.1e-15, 15.0, -7.1e-15]
+    mocker.patch("src.report.calcs.calculate_portfolio_pnl", return_value=pnl_data)
+
+    result = calculate_all_portfolio_pnl(
+        "dummy_path.xlsx", "2023-01-01", "2023-01-31", ""
+    )
+
+    assert result["Portfolio1"]["ticker"].unique().tolist() == ["AAPL"]
+
+
 def test_calculate_all_portfolio_pnl_benchmark(mocker: Any) -> None:
     mock_excel = mocker.patch("pandas.ExcelFile")
     mock_excel.return_value.sheet_names = []
