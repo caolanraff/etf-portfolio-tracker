@@ -6,7 +6,6 @@ Date: 2024-09-06
 """
 
 from datetime import timedelta
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -254,40 +253,49 @@ def calculate_all_portfolio_pnl(
     return result_dict
 
 
-def calculate_sharpe_ratio(ticker: str, end_date: Time) -> float:
+def calculate_portfolio_risk_metrics(df: Frame) -> dict[str, float]:
     """
-    Calculate the Sharpe ratio for a given ETF ticker.
+    Calculate annualised volatility, Sharpe ratio and max drawdown for a portfolio over the report period.
+
+    Daily returns are derived from the same period PnL % series used for the performance charts
+    (`pnl_pct_per_date`), which already nets out cash flows via the cumulative cost basis.
 
     Parameters:
-    ticker (str): Ticker symbol for the ETF.
-    end_date (Time): End date for calculating the Sharpe ratio.
+    df (Frame): A single portfolio's PnL DataFrame, as produced by `calculate_portfolio_pnl`.
 
     Returns:
-    float: Calculated Sharpe ratio as a float.
+    dict[str, float]: "Volatility" (annualised %), "Sharpe Ratio", and "Max Drawdown" (%).
     """
-    data = get_ticker_data(ticker)
-    min_date = end_date - timedelta(days=5 * 365)
-    data = data.loc[min_date:end_date]  # type: ignore[misc]
-    pct_chg = data[MARK_PRICE].pct_change()
-    sharpe = qs.stats.sharpe(pct_chg).round(2)
-    return float(sharpe)
+    group = (
+        df.groupby("date")
+        .agg(
+            {"portfolio_pnl": "first", "portfolio_value": "first", "total_cost": "sum"}
+        )
+        .reset_index()
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
+    group.loc[0, "total_cost"] = 0.0
+    group["pnl_pct_per_date"] = (
+        (group["portfolio_pnl"] - group["portfolio_pnl"].iloc[0])
+        / (group["portfolio_value"].iloc[0] + group["total_cost"].cumsum())
+        * 100
+    )
 
+    daily_returns = group["pnl_pct_per_date"].diff().dropna() / 100
+    cumulative_index = 1 + group["pnl_pct_per_date"] / 100
 
-def calculate_ytd(ticker: str, end_date: Time) -> Any:
-    """
-    Calculate the Sharpe ratio for a given ETF ticker.
+    if daily_returns.std(ddof=1) in (0, None) or pd.isna(daily_returns.std(ddof=1)):
+        volatility = 0.0
+        sharpe = 0.0
+    else:
+        volatility = float(qs.stats.volatility(daily_returns).round(4) * 100)
+        sharpe = float(qs.stats.sharpe(daily_returns).round(2))
 
-    Parameters:
-    ticker (str): Ticker symbol for the ETF.
-    end_date (Time): End date for calculating the Sharpe ratio.
+    max_drawdown = float(qs.stats.max_drawdown(cumulative_index) * 100)
 
-    Returns:
-    float: Calculated Sharpe ratio as a float.
-    """
-    data = get_ticker_data(ticker)
-    min_date = pd.to_datetime(end_date.year, format="%Y")
-    data = data.loc[min_date:end_date]  # type: ignore[misc]
-    start = data.head(1)[MARK_PRICE].iloc[0]
-    end = data.tail(1)[MARK_PRICE].iloc[0]
-    ytd = ((end - start) / start) * 100
-    return round(ytd, 2)
+    return {
+        "Volatility": round(volatility, 2),
+        "Sharpe Ratio": sharpe,
+        "Max Drawdown": round(max_drawdown, 2),
+    }

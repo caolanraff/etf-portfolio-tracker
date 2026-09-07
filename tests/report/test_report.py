@@ -13,6 +13,7 @@ from src.report.report import (
     create_metrics_page,
     create_new_trades_page,
     create_overlaps_page,
+    create_risk_metrics_page,
     create_title_page,
     create_top_holdings_page,
     get_aum,
@@ -329,6 +330,31 @@ def test_create_metrics_page(mocker: Any) -> None:
         result_dict, end_date, [""], operator, highlight, output_dir
     )
     assert result == ["/path/to/pdf1", "/path/to/pdf2"]
+
+
+def test_create_risk_metrics_page(mocker: Any) -> None:
+    mocker.patch(
+        "src.report.report.calculate_portfolio_risk_metrics",
+        return_value={"Volatility": 12.5, "Sharpe Ratio": 1.1, "Max Drawdown": -5.0},
+    )
+    mock_df_to_pdf = mocker.patch(
+        "src.report.report.df_to_pdf", return_value=["/path/to/pdf"]
+    )
+
+    result_dict = {
+        "Portfolio1": pd.DataFrame({"date": [pd.Timestamp("2023-10-01")]}),
+        "Portfolio2": pd.DataFrame({"date": [pd.Timestamp("2023-10-01")]}),
+    }
+
+    result = create_risk_metrics_page(result_dict, "/output/dir")
+
+    assert result == ["/path/to/pdf"]
+    result_df = mock_df_to_pdf.call_args[0][1]
+    assert result_df["Portfolio"].to_list() == ["Portfolio1", "Portfolio2"]
+    assert result_df["Sharpe Ratio"].to_list() == [1.1, 1.1]
+
+    result = create_risk_metrics_page(result_dict)
+    assert result == []
 
 
 def test_get_summary(mocker: Any) -> None:

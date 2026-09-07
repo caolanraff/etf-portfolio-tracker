@@ -21,6 +21,7 @@ from src.report.report import (
     create_metrics_page,
     create_new_trades_page,
     create_overlaps_page,
+    create_risk_metrics_page,
     create_title_page,
     create_top_holdings_page,
     get_aum,
@@ -155,6 +156,11 @@ def report(args: Any, config: Any) -> None:
     logging.info("Plotting performance charts")
     perf_charts = plot_performance_charts(args, res_dict, f"{args.path}/data/output")
     sections.append(("Performance Charts", [perf_charts]))
+
+    logging.info("Getting portfolio risk metrics")
+    risk_metrics = create_risk_metrics_page(res_dict, f"{args.path}/data/output")
+    sections.append(("Risk Metrics", risk_metrics))
+
     # Don't need the brenchmark for the rest of the analysis
     res_dict.pop("Benchmark", None)
 

@@ -9,8 +9,7 @@ from src.report.calcs import (
     calculate_costs_and_proceeds,
     calculate_entry_price,
     calculate_portfolio_pnl,
-    calculate_sharpe_ratio,
-    calculate_ytd,
+    calculate_portfolio_risk_metrics,
     process_stock_splits,
 )
 
@@ -134,30 +133,34 @@ def test_calculate_portfolio_pnl(mocker: Any) -> None:
     assert_frame_equal(result, expected)
 
 
-def test_calculate_sharpe_ratio(mocker: Any) -> None:
-    mock_data = pd.DataFrame(
-        {"Close": [5, 6, 8, 10, 3]},
-        index=pd.date_range(start="2024-01-01", periods=5),
+def test_calculate_portfolio_risk_metrics() -> None:
+    data = pd.DataFrame(
+        {
+            "date": pd.date_range(start="2023-01-01", periods=5, freq="D"),
+            "portfolio_pnl": [0.0, 20.0, 50.0, 10.0, 30.0],
+            "portfolio_value": [1000.0] * 5,
+            "total_cost": [0.0] * 5,
+        }
     )
-    mocker.patch("src.report.calcs.get_ticker_data", return_value=mock_data)
 
-    result = calculate_sharpe_ratio("SPY", datetime(2024, 1, 6))
-    expected = 0.63
+    result = calculate_portfolio_risk_metrics(data)
+    expected = {"Volatility": 50.82, "Sharpe Ratio": 3.72, "Max Drawdown": -3.81}
 
     assert result == expected
 
 
-def test_calculate_ytd(mocker: Any) -> None:
-    mock_data = pd.DataFrame(
+def test_calculate_portfolio_risk_metrics_flat() -> None:
+    data = pd.DataFrame(
         {
-            "Close": [100, 110, 103.5],
-            "Date": pd.date_range(start="2023-01-01", periods=3),
+            "date": pd.date_range(start="2023-01-01", periods=3, freq="D"),
+            "portfolio_pnl": [0.0, 0.0, 0.0],
+            "portfolio_value": [1000.0] * 3,
+            "total_cost": [0.0] * 3,
         }
-    ).set_index("Date")
-    mocker.patch("src.report.calcs.get_ticker_data", return_value=mock_data)
+    )
 
-    result = calculate_ytd("AAPL", datetime(2023, 1, 3))
-    expected = 3.5
+    result = calculate_portfolio_risk_metrics(data)
+    expected = {"Volatility": 0.0, "Sharpe Ratio": 0.0, "Max Drawdown": 0.0}
 
     assert result == expected
 

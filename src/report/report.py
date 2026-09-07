@@ -16,6 +16,7 @@ from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
 from src.cli.const import CHART_PALETTE, MARK_PRICE
+from src.report.calcs import calculate_portfolio_risk_metrics
 from src.utils.data import get_metrics, get_sector_weightings, get_ticker_info
 from src.utils.pdf import df_to_pdf, save_paragraphs_to_pdf
 from src.utils.types import DictFrame, Frame, Time
@@ -384,6 +385,32 @@ def plot_performance_charts(
         return file
     else:
         plt.show()
+
+
+def create_risk_metrics_page(result_dict: DictFrame, output_dir: str = "") -> Any:
+    """
+    Compute annualised volatility, Sharpe ratio and max drawdown for each portfolio over the report period.
+
+    Parameters:
+    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    output_dir (str): The directory where the output PDF will be saved.
+
+    Returns:
+    Any: The file paths of the created PDFs if `output_dir` is provided, otherwise None.
+    """
+    rows = []
+    for key, df in result_dict.items():
+        metrics = calculate_portfolio_risk_metrics(df)
+        rows.append({"Portfolio": key, **metrics})
+
+    result_df = pd.DataFrame(rows)
+
+    if output_dir != "":
+        files = df_to_pdf("Risk Metrics", result_df, output_dir)
+        return files
+    else:
+        print(result_df)
+        return []
 
 
 def plot_combined_pie_chart(

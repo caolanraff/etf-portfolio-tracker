@@ -16,6 +16,8 @@ This will create a PDF report (sample below) with the following pages:
 - Summary returns
   - With optional notes for best/worst
 - Charts from the summary report
+- Portfolio risk metrics
+  - Volatility, Sharpe Ratio, Max Drawdown (over the report period)
 - New trades made in that timeframe
 - Best and worst ETF performers
 - ETF weightings
