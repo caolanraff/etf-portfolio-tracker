@@ -346,14 +346,15 @@ def test_create_risk_metrics_page(mocker: Any) -> None:
         "Portfolio2": pd.DataFrame({"date": [pd.Timestamp("2023-10-01")]}),
     }
 
-    result = create_risk_metrics_page(result_dict, "/output/dir")
+    end_date = pd.Timestamp("2023-10-01")
+    result = create_risk_metrics_page(result_dict, end_date, "/output/dir")
 
     assert result == ["/path/to/pdf"]
     result_df = mock_df_to_pdf.call_args[0][1]
     assert result_df["Portfolio"].to_list() == ["Portfolio1", "Portfolio2"]
     assert result_df["Sharpe Ratio"].to_list() == [1.1, 1.1]
 
-    result = create_risk_metrics_page(result_dict)
+    result = create_risk_metrics_page(result_dict, end_date)
     assert result == []
 
 

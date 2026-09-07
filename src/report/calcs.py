@@ -202,6 +202,34 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
     return result_df
 
 
+def calculate_portfolio_pnl_history(path: str, end_date: Time) -> DictFrame:
+    """
+    Calculate the full, since-inception profit and loss (PnL) for every portfolio.
+
+    Unlike `calculate_all_portfolio_pnl`, this doesn't truncate each portfolio to a reporting window, so it's
+    suitable as input to a trailing-window calculation (e.g. `calculate_portfolio_risk_metrics`) that needs to
+    look back further than the current report's start date.
+
+    Parameters:
+    path (str): Path to the Excel file containing portfolio data.
+    end_date (Time): The end date for the calculation period.
+
+    Returns:
+    DictFrame: Dictionary containing each portfolio's full PnL history.
+    """
+    result_dict = {}
+    sheets = pd.ExcelFile(path).sheet_names
+
+    for sheet in sheets:
+        data = pd.read_excel(path, sheet_name=sheet)
+        if len(data) == 0:
+            print(f"Tab is empty for {sheet}")
+            continue
+        result_dict[sheet] = calculate_portfolio_pnl(data, end_date)
+
+    return result_dict
+
+
 def calculate_all_portfolio_pnl(
     path: str, start_date: Time, end_date: Time, benchmark: str
 ) -> DictFrame:
@@ -253,19 +281,30 @@ def calculate_all_portfolio_pnl(
     return result_dict
 
 
-def calculate_portfolio_risk_metrics(df: Frame) -> dict[str, float]:
+def calculate_portfolio_risk_metrics(
+    df: Frame, end_date: Time, lookback_days: int = 365
+) -> dict[str, float]:
     """
-    Calculate annualised volatility, Sharpe ratio and max drawdown for a portfolio over the report period.
+    Calculate annualised volatility, Sharpe ratio and max drawdown for a portfolio over a trailing window.
 
-    Daily returns are derived from the same period PnL % series used for the performance charts
-    (`pnl_pct_per_date`), which already nets out cash flows via the cumulative cost basis.
+    Uses a trailing `lookback_days` window ending at `end_date` (365 days / 1 year by default), falling
+    back to the portfolio's full history if it's younger than that, so the numbers stay stable across
+    reports regardless of the report's own timeframe. Daily returns are derived from the same period PnL %
+    series used for the performance charts (`pnl_pct_per_date`), which already nets out cash flows via the
+    cumulative cost basis.
 
     Parameters:
-    df (Frame): A single portfolio's PnL DataFrame, as produced by `calculate_portfolio_pnl`.
+    df (Frame): A single portfolio's full, since-inception PnL DataFrame, as produced by `calculate_portfolio_pnl`.
+    end_date (Time): The end of the trailing lookback window.
+    lookback_days (int): Length of the trailing window in days. Defaults to 365 (1 year).
 
     Returns:
     dict[str, float]: "Volatility" (annualised %), "Sharpe Ratio", and "Max Drawdown" (%).
     """
+    end = pd.Timestamp(end_date)
+    start = max(end - timedelta(days=lookback_days), df["date"].min())
+    df = df[(df["date"] >= start) & (df["date"] <= end)]
+
     group = (
         df.groupby("date")
         .agg(

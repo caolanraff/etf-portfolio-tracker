@@ -13,7 +13,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from src.report.calcs import calculate_all_portfolio_pnl
+from src.report.calcs import (
+    calculate_all_portfolio_pnl,
+    calculate_portfolio_pnl_history,
+)
 from src.report.report import (
     create_best_and_worst_combined_page,
     create_best_and_worst_page,
@@ -210,7 +213,10 @@ def report(args: Any, config: Any) -> None:
     sections.append(("Metrics", metrics))
 
     logging.info("Getting portfolio risk metrics")
-    risk_metrics = create_risk_metrics_page(res_dict, f"{args.path}/data/output")
+    history_dict = calculate_portfolio_pnl_history(file, args.end_date)
+    risk_metrics = create_risk_metrics_page(
+        history_dict, args.end_date, f"{args.path}/data/output"
+    )
     sections.append(("Risk Metrics", risk_metrics))
 
     logging.info("Getting ETF underlying data")

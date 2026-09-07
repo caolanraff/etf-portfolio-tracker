@@ -9,6 +9,7 @@ from src.report.calcs import (
     calculate_costs_and_proceeds,
     calculate_entry_price,
     calculate_portfolio_pnl,
+    calculate_portfolio_pnl_history,
     calculate_portfolio_risk_metrics,
     process_stock_splits,
 )
@@ -143,7 +144,7 @@ def test_calculate_portfolio_risk_metrics() -> None:
         }
     )
 
-    result = calculate_portfolio_risk_metrics(data)
+    result = calculate_portfolio_risk_metrics(data, datetime(2023, 1, 5))
     expected = {"Volatility": 50.82, "Sharpe Ratio": 3.72, "Max Drawdown": -3.81}
 
     assert result == expected
@@ -159,10 +160,73 @@ def test_calculate_portfolio_risk_metrics_flat() -> None:
         }
     )
 
-    result = calculate_portfolio_risk_metrics(data)
+    result = calculate_portfolio_risk_metrics(data, datetime(2023, 1, 3))
     expected = {"Volatility": 0.0, "Sharpe Ratio": 0.0, "Max Drawdown": 0.0}
 
     assert result == expected
+
+
+def test_calculate_portfolio_risk_metrics_trailing_window() -> None:
+    # A large loss over 2 years ago, then 5 flat trailing days: only the trailing
+    # window should be used, so the old loss shouldn't show up in the drawdown/vol.
+    old_dates = pd.date_range(start="2020-01-01", periods=3, freq="D")
+    recent_dates = pd.date_range(start="2023-01-01", periods=5, freq="D")
+    data = pd.DataFrame(
+        {
+            "date": list(old_dates) + list(recent_dates),
+            "portfolio_pnl": [0.0, -500.0, 0.0] + [0.0] * 5,
+            "portfolio_value": [1000.0] * 8,
+            "total_cost": [0.0] * 8,
+        }
+    )
+
+    result = calculate_portfolio_risk_metrics(data, datetime(2023, 1, 5))
+    expected = {"Volatility": 0.0, "Sharpe Ratio": 0.0, "Max Drawdown": 0.0}
+
+    assert result == expected
+
+
+def test_calculate_portfolio_risk_metrics_fallback_to_inception() -> None:
+    # A portfolio younger than the lookback window should just use its full history.
+    data = pd.DataFrame(
+        {
+            "date": pd.date_range(start="2023-01-01", periods=5, freq="D"),
+            "portfolio_pnl": [0.0, 20.0, 50.0, 10.0, 30.0],
+            "portfolio_value": [1000.0] * 5,
+            "total_cost": [0.0] * 5,
+        }
+    )
+
+    result = calculate_portfolio_risk_metrics(
+        data, datetime(2023, 1, 5), lookback_days=10000
+    )
+    expected = {"Volatility": 50.82, "Sharpe Ratio": 3.72, "Max Drawdown": -3.81}
+
+    assert result == expected
+
+
+def test_calculate_portfolio_pnl_history(mocker: Any) -> None:
+    mock_excel = mocker.patch("pandas.ExcelFile")
+    mock_read_excel = mocker.patch("pandas.read_excel")
+
+    mock_excel.return_value.sheet_names = ["Portfolio1", "Portfolio2"]
+    mock_data1 = pd.DataFrame(
+        {
+            "date": ["2023-01-01", "2023-01-02"],
+            "ticker": ["AAPL", "AAPL"],
+            "quantity": [10, 5],
+            "price": [150, 155],
+        }
+    )
+    mock_read_excel.side_effect = [mock_data1, pd.DataFrame()]
+
+    mock_calculate_pnl = mocker.patch("src.report.calcs.calculate_portfolio_pnl")
+    mock_calculate_pnl.side_effect = [mock_data1]
+
+    result = calculate_portfolio_pnl_history("dummy_path.xlsx", datetime(2023, 1, 31))
+
+    assert list(result.keys()) == ["Portfolio1"]
+    assert_frame_equal(result["Portfolio1"], mock_data1)
 
 
 def test_calculate_all_portfolio_pnl(mocker: Any) -> None:

@@ -387,12 +387,15 @@ def plot_performance_charts(
         plt.show()
 
 
-def create_risk_metrics_page(result_dict: DictFrame, output_dir: str = "") -> Any:
+def create_risk_metrics_page(
+    result_dict: DictFrame, end_date: Time, output_dir: str = ""
+) -> Any:
     """
-    Compute annualised volatility, Sharpe ratio and max drawdown for each portfolio over the report period.
+    Compute annualised volatility, Sharpe ratio and max drawdown for each portfolio over a trailing 1-year window.
 
     Parameters:
-    result_dict (DictFrame): A dictionary containing portfolio data as DataFrame objects.
+    result_dict (DictFrame): A dictionary containing each portfolio's full, since-inception PnL history.
+    end_date (Time): The end of the trailing lookback window.
     output_dir (str): The directory where the output PDF will be saved.
 
     Returns:
@@ -400,7 +403,7 @@ def create_risk_metrics_page(result_dict: DictFrame, output_dir: str = "") -> An
     """
     rows = []
     for key, df in result_dict.items():
-        metrics = calculate_portfolio_risk_metrics(df)
+        metrics = calculate_portfolio_risk_metrics(df, end_date)
         rows.append({"Portfolio": key, **metrics})
 
     result_df = pd.DataFrame(rows)
