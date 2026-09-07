@@ -9,6 +9,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from src.cli.const import MARK_PRICE, STOCK_SPLITS
@@ -52,7 +53,10 @@ def positions_for_trades(trades: pd.DataFrame) -> pd.DataFrame:
 
     result = pd.DataFrame({"position": position})
     result = result.join(grouped[["avg_price"]], how="left")
-    result = result[result["position"] != 0]
+    # Use a tolerance instead of exact equality: summing many non-exact decimal
+    # trade quantities over time leaves a tiny (~1e-14) floating-point residue
+    # even for genuinely closed-out positions.
+    result = result[~np.isclose(result["position"], 0, atol=1e-6)]
     return result.sort_index()
 
 
