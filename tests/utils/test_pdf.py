@@ -8,8 +8,10 @@ from reportlab.platypus import SimpleDocTemplate
 
 from src.utils.pdf import (
     add_page_numbers,
+    create_toc_page,
     df_to_pdf,
     merge_pdfs,
+    merge_pdfs_with_toc,
     save_paragraphs_to_pdf,
 )
 
@@ -94,6 +96,48 @@ def test_add_page_numbers(mocker: Any) -> None:
     mock_page_merge.assert_any_call(page1)
     mock_page_merge.assert_any_call(page2)
     assert mock_page_merge.return_value.add.return_value.render.call_count == 2
+
+
+def test_create_toc_page(mocker: Any) -> None:
+    mocker.patch("reportlab.platypus.SimpleDocTemplate.build")
+
+    entries = [("Summary", 3), ("Metrics", 10), ("ETF Descriptions", 25)]
+    output_dir = "/tmp"
+
+    file_path = create_toc_page(entries, output_dir)
+
+    assert file_path == "/tmp/table_of_contents.pdf"
+    SimpleDocTemplate.build.assert_called_once()
+
+
+def test_merge_pdfs_with_toc(mocker: Any) -> None:
+    page_counts = {"s1a.pdf": 2, "s1b.pdf": 1, "s2a.pdf": 2}
+    mock_pdf_reader = mocker.patch("pdfrw.PdfReader")
+    mock_pdf_reader.side_effect = lambda f: MagicMock(
+        pages=[MagicMock()] * page_counts[f]
+    )
+
+    mock_create_toc_page = mocker.patch(
+        "src.utils.pdf.create_toc_page", return_value="/tmp/table_of_contents.pdf"
+    )
+    mock_merge_pdfs = mocker.patch("src.utils.pdf.merge_pdfs")
+
+    sections = [
+        ("Section One", ["s1a.pdf", "s1b.pdf"]),
+        ("Section Two", ["s2a.pdf"]),
+    ]
+
+    merge_pdfs_with_toc("title.pdf", sections, "/tmp/output.pdf")
+
+    # Section One starts right after the title (1) and TOC (1) pages, i.e. page 3;
+    # Section Two starts after Section One's 3 pages, i.e. page 6.
+    mock_create_toc_page.assert_called_once_with(
+        [("Section One", 3), ("Section Two", 6)], "/tmp"
+    )
+    mock_merge_pdfs.assert_called_once_with(
+        ["title.pdf", "/tmp/table_of_contents.pdf", "s1a.pdf", "s1b.pdf", "s2a.pdf"],
+        "/tmp/output.pdf",
+    )
 
 
 def test_save_paragraphs_to_pdf(mocker: Any) -> None:

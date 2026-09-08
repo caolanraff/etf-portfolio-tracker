@@ -7,7 +7,7 @@ Date: 2023-07-02
 
 import io
 import os
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,7 +16,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Paragraph, SimpleDocTemplate
+from reportlab.platypus import Paragraph, Preformatted, SimpleDocTemplate, Spacer
 
 from src.utils.types import Frame
 from src.utils.util import convert_to_snake_case
@@ -183,6 +183,82 @@ def merge_pdfs(input_files: List[str], output_file: str) -> None:
         os.remove(file_name)
     add_page_numbers(pdf_output)
     pdf_output.write(output_file)
+
+
+def create_toc_page(entries: List[Tuple[str, int]], output_dir: str) -> str:
+    """
+    Render a table of contents PDF page, with dot leaders connecting each section to its page.
+
+    Rendered as a monospaced block rather than a table, so the dot leaders line up perfectly
+    across rows regardless of how long each section title is.
+
+    Parameters:
+    entries (List[Tuple[str, int]]): (section title, starting page number) pairs, in report order.
+    output_dir (str): The path to the output directory.
+
+    Returns:
+    str: The file path of the created PDF.
+    """
+    file = f"{output_dir}/table_of_contents.pdf"
+    doc = SimpleDocTemplate(file, pagesize=letter, topMargin=72, bottomMargin=72)
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "TOCTitle", parent=styles["Title"], fontSize=22, spaceAfter=28
+    )
+    entry_style = ParagraphStyle(
+        "TOCEntry", fontName="Courier", fontSize=11, leading=24
+    )
+
+    # Chosen so a title + dot leader + page number fits within a letter page's usable width
+    # (6.5in) at 11pt Courier (~6.6pt per character).
+    line_width = 68
+
+    lines = []
+    for title, page in entries:
+        label = str(page)
+        dots = "." * max(3, line_width - len(title) - len(label) - 1)
+        lines.append(f"{title} {dots} {label}")
+
+    elements = [
+        Paragraph("Table of Contents", title_style),
+        Spacer(1, 6),
+        Preformatted("\n".join(lines), entry_style),
+    ]
+    doc.build(elements)
+    return file
+
+
+def merge_pdfs_with_toc(
+    title_page: str, sections: List[Tuple[str, List[str]]], output_file: str
+) -> None:
+    """
+    Build a table of contents for a list of report sections, then merge everything into one PDF.
+
+    The table of contents is always exactly one page, so each section's starting page number can
+    be computed up front from its page count, without needing a second pass once the table of
+    contents itself is generated.
+
+    Parameters:
+    title_page (str): File path of the title page PDF.
+    sections (List[Tuple[str, List[str]]]): (section title, file paths) pairs, in report order.
+    output_file (str): The output file path (string) where the merged PDF file will be saved.
+    """
+    output_dir = os.path.dirname(output_file)
+    page_counts = [
+        sum(len(pdfrw.PdfReader(f).pages) for f in files) for _, files in sections
+    ]
+
+    page = 3  # after the title page (1) and the table of contents (1)
+    entries = []
+    for (title, _), count in zip(sections, page_counts):
+        entries.append((title, page))
+        page += count
+
+    toc_file = create_toc_page(entries, output_dir)
+
+    all_files = [title_page, toc_file] + [f for _, files in sections for f in files]
+    merge_pdfs(all_files, output_file)
 
 
 def save_paragraphs_to_pdf(
