@@ -5,6 +5,7 @@ Author: Caolan Rafferty
 Date: 2023-07-02
 """
 
+import io
 import os
 from typing import List, Optional
 
@@ -14,6 +15,7 @@ import pdfrw
 from matplotlib.backends.backend_pdf import PdfPages
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate
 
 from src.utils.types import Frame
@@ -133,9 +135,41 @@ def df_to_pdf(
     return file_list
 
 
+def add_page_numbers(pdf_output: pdfrw.PdfWriter) -> None:
+    """
+    Stamp "Page X of Y" onto the bottom-right corner of every page already added to a PdfWriter.
+
+    The bottom-right corner is used (rather than bottom-centre) because some pages - e.g. the
+    matplotlib chart pages - have rotated x-axis tick labels that run close to the bottom edge
+    and would otherwise overlap a centred page number.
+
+    Each page keeps its own MediaBox, so the overlay is sized and positioned per-page rather
+    than assuming a single fixed page size across the whole report.
+
+    Parameters:
+    pdf_output (pdfrw.PdfWriter): The writer holding the pages to number, in place.
+    """
+    pages = pdf_output.pagearray
+    total_pages = len(pages)
+
+    for i, page in enumerate(pages, start=1):
+        media_box = [float(x) for x in page.MediaBox]
+        width, height = media_box[2] - media_box[0], media_box[3] - media_box[1]
+
+        packet = io.BytesIO()
+        pdf_canvas = canvas.Canvas(packet, pagesize=(width, height))
+        pdf_canvas.setFont("Helvetica", 8)
+        pdf_canvas.drawRightString(width - 20, 12, f"Page {i} of {total_pages}")
+        pdf_canvas.save()
+        packet.seek(0)
+
+        overlay = pdfrw.PdfReader(packet).pages[0]
+        pdfrw.PageMerge(page).add(overlay).render()
+
+
 def merge_pdfs(input_files: List[str], output_file: str) -> None:
     """
-    Merge multiple PDF files into a single PDF file.
+    Merge multiple PDF files into a single PDF file, with page numbers stamped on every page.
 
     Parameters:
     input_files (List[str]): A list of input file paths (strings) representing the PDF files to be merged.
@@ -147,6 +181,7 @@ def merge_pdfs(input_files: List[str], output_file: str) -> None:
         for page in pdf_input.pages:
             pdf_output.addpage(page)
         os.remove(file_name)
+    add_page_numbers(pdf_output)
     pdf_output.write(output_file)
 
 

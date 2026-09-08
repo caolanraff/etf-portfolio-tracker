@@ -6,7 +6,12 @@ import pytest
 from matplotlib.backends.backend_pdf import PdfPages
 from reportlab.platypus import SimpleDocTemplate
 
-from src.utils.pdf import df_to_pdf, merge_pdfs, save_paragraphs_to_pdf
+from src.utils.pdf import (
+    add_page_numbers,
+    df_to_pdf,
+    merge_pdfs,
+    save_paragraphs_to_pdf,
+)
 
 
 def test_df_to_pdf(mocker: Any) -> None:
@@ -48,6 +53,7 @@ def test_merge_pdfs(mocker: Any) -> None:
     pdf_reader_instance.pages = [MagicMock(), MagicMock()]
 
     mock_os_remove = mocker.patch("os.remove")
+    mock_add_page_numbers = mocker.patch("src.utils.pdf.add_page_numbers")
 
     merge_pdfs(input_files, output_file)
 
@@ -64,6 +70,30 @@ def test_merge_pdfs(mocker: Any) -> None:
     assert mock_os_remove.call_count == len(input_files)
     for call in mock_os_remove.call_args_list:
         assert call[0][0] in input_files
+
+    # Check page numbers were stamped onto the merged writer before saving
+    mock_add_page_numbers.assert_called_once_with(mock_pdf_writer.return_value)
+
+
+def test_add_page_numbers(mocker: Any) -> None:
+    page1 = MagicMock()
+    page1.MediaBox = ["0", "0", "612", "792"]
+    page2 = MagicMock()
+    page2.MediaBox = ["0", "0", "612", "792"]
+
+    pdf_output = MagicMock()
+    pdf_output.pagearray = [page1, page2]
+
+    mock_page_merge = mocker.patch("pdfrw.PageMerge")
+    mock_pdf_reader = mocker.patch("pdfrw.PdfReader")
+    mock_pdf_reader.return_value.pages = [MagicMock()]
+
+    add_page_numbers(pdf_output)
+
+    assert mock_page_merge.call_count == 2
+    mock_page_merge.assert_any_call(page1)
+    mock_page_merge.assert_any_call(page2)
+    assert mock_page_merge.return_value.add.return_value.render.call_count == 2
 
 
 def test_save_paragraphs_to_pdf(mocker: Any) -> None:
