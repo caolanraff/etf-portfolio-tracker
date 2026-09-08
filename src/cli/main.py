@@ -31,7 +31,7 @@ from src.report.report import (
     plot_sector_weightings_page,
 )
 from src.utils.data import get_etf_underlyings, ticker_data
-from src.utils.pdf import merge_pdfs
+from src.utils.pdf import merge_pdfs_with_toc
 from src.utils.util import parse_date
 
 
@@ -117,7 +117,7 @@ def report(args: Any, config: Any) -> None:
     logging.info(
         f"Running report for {args.timeframe} ({args.start_date:%Y-%m-%d} - {args.end_date:%Y-%m-%d})"
     )
-    saved_pdf_files = []
+    sections: list[tuple[str, list[str]]] = []
 
     logging.info("Calculating portfolio PnLs")
     filename = config.get("Input", "file")
@@ -136,7 +136,6 @@ def report(args: Any, config: Any) -> None:
     title_page = create_title_page(
         title, aum, image, args.end_date, f"{args.path}/data/output"
     )
-    saved_pdf_files.append(title_page)
 
     logging.info("Getting summary information")
     comments = {
@@ -151,23 +150,23 @@ def report(args: Any, config: Any) -> None:
         comments,
         f"{args.path}/data/output",
     )
-    saved_pdf_files.extend(summary)
+    sections.append(("Summary", summary))
 
     logging.info("Plotting performance charts")
     perf_charts = plot_performance_charts(args, res_dict, f"{args.path}/data/output")
-    saved_pdf_files.append(perf_charts)
+    sections.append(("Performance Charts", [perf_charts]))
     # Don't need the brenchmark for the rest of the analysis
     res_dict.pop("Benchmark", None)
 
     logging.info("Creating new trades page")
     new_trades = create_new_trades_page(res_dict, f"{args.path}/data/output")
-    saved_pdf_files.extend(new_trades)
+    sections.append(("New Trades", new_trades))
 
     logging.info("Getting best and worst ETFs page")
     best_and_worst = create_best_and_worst_page(
         res_dict, args.end_date, f"{args.path}/data/output"
     )
-    saved_pdf_files.extend(best_and_worst)
+    sections.append(("Best & Worst Performers", best_and_worst))
 
     logging.info("Getting combined best and worst ETFs page")
     best_and_worst_comb = create_best_and_worst_combined_page(
@@ -178,7 +177,7 @@ def report(args: Any, config: Any) -> None:
         5,
         f"{args.path}/data/output",
     )
-    saved_pdf_files.extend(best_and_worst_comb)
+    sections.append(("Best & Worst Performers Combined", best_and_worst_comb))
 
     logging.info("Plotting ETF weightings")
     threshold = config.get("WeightingsPage", "other")
@@ -186,13 +185,13 @@ def report(args: Any, config: Any) -> None:
     pie_charts = plot_pie_charts(
         res_dict, args.end_date, threshold, f"{args.path}/data/output"
     )
-    saved_pdf_files.append(pie_charts)
+    sections.append(("ETF Weightings", [pie_charts]))
 
     logging.info("Plotting combined ETF weightings")
     combined_pie_charts = plot_combined_pie_chart(
         res_dict, args.end_date, threshold, f"{args.path}/data/output"
     )
-    saved_pdf_files.append(combined_pie_charts)
+    sections.append(("Combined ETF Weightings", [combined_pie_charts]))
 
     logging.info("Getting metrics")
     threshold = config.get("MetricsPage", "threshold").split(",")
@@ -206,7 +205,7 @@ def report(args: Any, config: Any) -> None:
         highlight,
         f"{args.path}/data/output",
     )
-    saved_pdf_files.extend(metrics)
+    sections.append(("Metrics", metrics))
 
     logging.info("Getting ETF underlying data")
     underlyings_source = config.get("HoldingsPage", "source")
@@ -226,26 +225,26 @@ def report(args: Any, config: Any) -> None:
         threshold,
         f"{args.path}/data/output",
     )
-    saved_pdf_files.extend(holdings)
+    sections.append(("Top Holdings", holdings))
 
     logging.info("Creating sector weightings page")
     sectors = plot_sector_weightings_page(
         res_dict, args.end_date, f"{args.path}/data/output"
     )
-    saved_pdf_files.append(sectors)
+    sections.append(("Sector Weightings", [sectors]))
 
     logging.info("Plotting ETF overlap heatmap")
     overlaps = create_overlaps_page(res_dict, underlyings, f"{args.path}/data/output")
-    saved_pdf_files.extend(overlaps)
+    sections.append(("ETF Overlaps", overlaps))
 
     logging.info("Creating description page")
     descriptions = create_descriptions_page(
         sorted(ticker_data.keys()), f"{args.path}/data/output"
     )
-    saved_pdf_files.append(descriptions)
+    sections.append(("ETF Descriptions", [descriptions]))
 
     output_file = config.get("Output", "file")
-    merge_pdfs(saved_pdf_files, f"{args.path}/data/output/{output_file}")
+    merge_pdfs_with_toc(title_page, sections, f"{args.path}/data/output/{output_file}")
 
     logging.info("Complete")
 
