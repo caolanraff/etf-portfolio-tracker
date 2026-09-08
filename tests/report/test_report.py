@@ -128,7 +128,7 @@ def test_create_best_and_worst_combined_page(mocker: Any) -> None:
     output_dir = "/tmp"
 
     result = create_best_and_worst_combined_page(
-        result_dict, ticker_data, start_date, end_date, output_dir
+        result_dict, ticker_data, start_date, end_date, 2, output_dir
     )
 
     assert result == ["/tmp/mock.pdf"]
@@ -356,6 +356,67 @@ def test_get_summary(mocker: Any) -> None:
 
     result = get_summary(result_dict, start_date, end_date, timeframe, comments, "")
     assert result is None
+
+
+def test_get_summary_no_benchmark_omits_alpha_column(mocker: Any) -> None:
+    mock_df_to_pdf = mocker.patch(
+        "src.report.report.df_to_pdf", return_value=["/tmp/summary_1.pdf"]
+    )
+    result_dict = {
+        "ETF1": pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-01", "2023-01-02"]),
+                "portfolio_pnl": [1000, 1100],
+                "portfolio_value": [10000, 11000],
+                "quantity": [0, 10],
+                "total_cost": [0, 100],
+            }
+        )
+    }
+
+    get_summary(
+        result_dict, datetime(2023, 1, 1), datetime(2023, 1, 2), "YTD", None, "/tmp"
+    )
+
+    result_df = mock_df_to_pdf.call_args[0][1]
+    assert "Alpha" not in result_df.columns
+
+
+def test_get_summary_alpha_vs_benchmark(mocker: Any) -> None:
+    mock_df_to_pdf = mocker.patch(
+        "src.report.report.df_to_pdf", return_value=["/tmp/summary_1.pdf"]
+    )
+    result_dict = {
+        "ETF1": pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-01", "2023-01-02"]),
+                "portfolio_pnl": [1000, 1500],
+                "portfolio_value": [10000, 10000],
+                "quantity": [0, 0],
+                "total_cost": [0, 0],
+            }
+        ),
+        "Benchmark": pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-01", "2023-01-02"]),
+                "portfolio_pnl": [1000, 1200],
+                "portfolio_value": [10000, 10000],
+                "quantity": [0, 0],
+                "total_cost": [0, 0],
+            }
+        ),
+    }
+
+    get_summary(
+        result_dict, datetime(2023, 1, 1), datetime(2023, 1, 2), "YTD", None, "/tmp"
+    )
+
+    result_df = mock_df_to_pdf.call_args[0][1]
+    result_df = result_df.set_index("Portfolio")
+    assert result_df.loc["ETF1", "YTD"] == 5.0
+    assert result_df.loc["Benchmark", "YTD"] == 2.0
+    assert result_df.loc["ETF1", "Alpha"] == 3.0
+    assert result_df.loc["Benchmark", "Alpha"] == "-"
 
 
 def test_create_top_holdings_page(mocker: Any) -> None:

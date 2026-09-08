@@ -546,7 +546,7 @@ def get_summary(
     start_date: Time,
     end_date: Time,
     timeframe: str,
-    comments: dict[str, str],
+    comments: dict[str, str] | None,
     output_dir: str = "",
 ) -> Any:
     """
@@ -579,6 +579,16 @@ def get_summary(
     summary = summary.sort_values(by=timeframe, ascending=False)
     summary[timeframe] = summary[timeframe].round(3)
     summary = summary.reset_index(drop=True)
+
+    if "Benchmark" in summary["Portfolio"].values:
+        benchmark_return = summary.loc[
+            summary["Portfolio"] == "Benchmark", timeframe
+        ].iloc[0]
+        summary["Alpha"] = (
+            (summary[timeframe] - benchmark_return).round(3).astype(object)
+        )
+        summary.loc[summary["Portfolio"] == "Benchmark", "Alpha"] = "-"
+
     summary["Notes"] = ""
 
     if comments is not None:
