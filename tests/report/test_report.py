@@ -128,7 +128,7 @@ def test_create_best_and_worst_combined_page(mocker: Any) -> None:
     output_dir = "/tmp"
 
     result = create_best_and_worst_combined_page(
-        result_dict, ticker_data, start_date, end_date, 2, output_dir
+        result_dict, ticker_data, start_date, end_date, 5, output_dir
     )
 
     assert result == ["/tmp/mock.pdf"]
