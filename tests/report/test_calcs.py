@@ -5,6 +5,7 @@ import pandas as pd
 from pandas.testing import assert_frame_equal
 
 from src.report.calcs import (
+    build_benchmark_trades,
     calculate_all_portfolio_pnl,
     calculate_costs_and_proceeds,
     calculate_entry_price,
@@ -227,6 +228,42 @@ def test_calculate_portfolio_pnl_history(mocker: Any) -> None:
 
     assert list(result.keys()) == ["Portfolio1"]
     assert_frame_equal(result["Portfolio1"], mock_data1)
+
+
+def test_build_benchmark_trades(mocker: Any) -> None:
+    ticker_data = pd.DataFrame(
+        {"Close": [100.0, 101.0, 102.0, 103.0, 104.0]},
+        index=pd.date_range(start="2023-01-28", periods=5),
+    )
+    mocker.patch("src.report.calcs.get_ticker_data", return_value=ticker_data)
+
+    result = build_benchmark_trades("SPY", datetime(2023, 1, 28), datetime(2023, 2, 1))
+
+    assert result["date"].tolist() == [pd.Timestamp("2023-01-31")]
+    assert result["ticker"].tolist() == ["SPY"]
+    assert result["price"].tolist() == [103.0]
+    assert result["quantity"].tolist() == [1.0]
+
+
+def test_calculate_portfolio_pnl_history_benchmark(mocker: Any) -> None:
+    mock_excel = mocker.patch("pandas.ExcelFile")
+    mock_excel.return_value.sheet_names = []
+
+    ticker_data = pd.DataFrame(
+        {"Close": [100.0, 105.0, 110.0]},
+        index=pd.date_range(start="2023-01-29", periods=3),
+    )
+    mocker.patch("src.report.calcs.get_ticker_data", return_value=ticker_data)
+
+    mock_calculate_pnl = mocker.patch("src.report.calcs.calculate_portfolio_pnl")
+    mock_calculate_pnl.side_effect = [ticker_data]
+
+    result = calculate_portfolio_pnl_history(
+        "dummy_path.xlsx", datetime(2023, 1, 31), "SPY"
+    )
+
+    assert "Benchmark" in result
+    assert_frame_equal(result["Benchmark"], ticker_data)
 
 
 def test_calculate_all_portfolio_pnl(mocker: Any) -> None:

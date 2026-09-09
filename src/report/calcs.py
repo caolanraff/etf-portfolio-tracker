@@ -202,7 +202,9 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
     return result_df
 
 
-def calculate_portfolio_pnl_history(path: str, end_date: Time) -> DictFrame:
+def calculate_portfolio_pnl_history(
+    path: str, end_date: Time, benchmark: str = ""
+) -> DictFrame:
     """
     Calculate the full, since-inception profit and loss (PnL) for every portfolio.
 
@@ -213,6 +215,8 @@ def calculate_portfolio_pnl_history(path: str, end_date: Time) -> DictFrame:
     Parameters:
     path (str): Path to the Excel file containing portfolio data.
     end_date (Time): The end date for the calculation period.
+    benchmark (str): Ticker symbol for the benchmark portfolio. If provided, its history is synthesised far
+        enough back to cover a trailing 1-year lookback.
 
     Returns:
     DictFrame: Dictionary containing each portfolio's full PnL history.
@@ -227,7 +231,38 @@ def calculate_portfolio_pnl_history(path: str, end_date: Time) -> DictFrame:
             continue
         result_dict[sheet] = calculate_portfolio_pnl(data, end_date)
 
+    if benchmark != "":
+        start_date = pd.Timestamp(end_date) - timedelta(days=400)
+        benchmark_df = build_benchmark_trades(benchmark, start_date, end_date)
+        result_dict["Benchmark"] = calculate_portfolio_pnl(benchmark_df, end_date)
+
     return result_dict
+
+
+def build_benchmark_trades(benchmark: str, start_date: Time, end_date: Time) -> Frame:
+    """
+    Synthesise trades for a benchmark ticker: buy 1 share at the end of every month.
+
+    Parameters:
+    benchmark (str): Ticker symbol for the benchmark.
+    start_date (Time): The start date for the synthesised trade history.
+    end_date (Time): The end date for the synthesised trade history.
+
+    Returns:
+    Frame: DataFrame of synthesised "buy 1 share" trades on each month-end date in range.
+    """
+    data = get_ticker_data(benchmark)
+    data = data.loc[start_date:end_date][MARK_PRICE]  # type: ignore[misc]
+    benchmark_df = pd.DataFrame(
+        {
+            "date": data.index,
+            "ticker": len(data) * [benchmark],
+            "price": data.values,
+        }
+    )
+    benchmark_df = benchmark_df[benchmark_df["date"].dt.is_month_end]
+    benchmark_df["quantity"] = 1.0
+    return benchmark_df
 
 
 def calculate_all_portfolio_pnl(
@@ -265,17 +300,7 @@ def calculate_all_portfolio_pnl(
 
     # add benchmark portfolio
     if benchmark != "":
-        data = get_ticker_data(benchmark)
-        data = data.loc[start_date:end_date][MARK_PRICE]  # type: ignore[misc]
-        benchmark_df = pd.DataFrame(
-            {
-                "date": data.index,
-                "ticker": len(data) * [benchmark],
-                "price": data.values,
-            }
-        )
-        benchmark_df = benchmark_df[benchmark_df["date"].dt.is_month_end]
-        benchmark_df["quantity"] = 1.0
+        benchmark_df = build_benchmark_trades(benchmark, start_date, end_date)
         result_dict["Benchmark"] = calculate_portfolio_pnl(benchmark_df, end_date)
 
     return result_dict

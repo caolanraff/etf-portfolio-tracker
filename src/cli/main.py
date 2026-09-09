@@ -213,7 +213,7 @@ def report(args: Any, config: Any) -> None:
     sections.append(("Metrics", metrics))
 
     logging.info("Getting portfolio risk metrics")
-    history_dict = calculate_portfolio_pnl_history(file, args.end_date)
+    history_dict = calculate_portfolio_pnl_history(file, args.end_date, benchmark)
     risk_metrics = create_risk_metrics_page(
         history_dict, args.end_date, f"{args.path}/data/output"
     )
