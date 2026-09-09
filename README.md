@@ -23,6 +23,8 @@ This will create a PDF report (sample below) with the following pages:
 - ETF metrics
   - Sharpe Ratio, Beta, Expense Ratio, PE Ratio, Yield, YTD returns
   - With optional highlighing for high/low values
+- Portfolio risk metrics
+  - Volatility, Sharpe Ratio, Max Drawdown, each over a trailing 1-year window (or since inception if younger)
 - Highest weighted underlyings
 - Sector weightings
 - ETF percentage overlaps

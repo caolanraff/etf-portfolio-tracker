@@ -6,7 +6,6 @@ Date: 2024-09-06
 """
 
 from datetime import timedelta
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -203,6 +202,69 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
     return result_df
 
 
+def calculate_portfolio_pnl_history(
+    path: str, end_date: Time, benchmark: str = ""
+) -> DictFrame:
+    """
+    Calculate the full, since-inception profit and loss (PnL) for every portfolio.
+
+    Unlike `calculate_all_portfolio_pnl`, this doesn't truncate each portfolio to a reporting window, so it's
+    suitable as input to a trailing-window calculation (e.g. `calculate_portfolio_risk_metrics`) that needs to
+    look back further than the current report's start date.
+
+    Parameters:
+    path (str): Path to the Excel file containing portfolio data.
+    end_date (Time): The end date for the calculation period.
+    benchmark (str): Ticker symbol for the benchmark portfolio. If provided, its history is synthesised far
+        enough back to cover a trailing 1-year lookback.
+
+    Returns:
+    DictFrame: Dictionary containing each portfolio's full PnL history.
+    """
+    result_dict = {}
+    sheets = pd.ExcelFile(path).sheet_names
+
+    for sheet in sheets:
+        data = pd.read_excel(path, sheet_name=sheet)
+        if len(data) == 0:
+            print(f"Tab is empty for {sheet}")
+            continue
+        result_dict[sheet] = calculate_portfolio_pnl(data, end_date)
+
+    if benchmark != "":
+        start_date = pd.Timestamp(end_date) - timedelta(days=400)
+        benchmark_df = build_benchmark_trades(benchmark, start_date, end_date)
+        result_dict["Benchmark"] = calculate_portfolio_pnl(benchmark_df, end_date)
+
+    return result_dict
+
+
+def build_benchmark_trades(benchmark: str, start_date: Time, end_date: Time) -> Frame:
+    """
+    Synthesise trades for a benchmark ticker: buy 1 share at the end of every month.
+
+    Parameters:
+    benchmark (str): Ticker symbol for the benchmark.
+    start_date (Time): The start date for the synthesised trade history.
+    end_date (Time): The end date for the synthesised trade history.
+
+    Returns:
+    Frame: DataFrame of synthesised "buy 1 share" trades on each month-end date in range.
+    """
+    data = get_ticker_data(benchmark)
+    data = data.loc[start_date:end_date][MARK_PRICE]  # type: ignore[misc]
+    benchmark_df = pd.DataFrame(
+        {
+            "date": data.index,
+            "ticker": len(data) * [benchmark],
+            "price": data.values,
+        }
+    )
+    benchmark_df = benchmark_df[benchmark_df["date"].dt.is_month_end]
+    benchmark_df["quantity"] = 1.0
+    return benchmark_df
+
+
 def calculate_all_portfolio_pnl(
     path: str, start_date: Time, end_date: Time, benchmark: str
 ) -> DictFrame:
@@ -238,56 +300,66 @@ def calculate_all_portfolio_pnl(
 
     # add benchmark portfolio
     if benchmark != "":
-        data = get_ticker_data(benchmark)
-        data = data.loc[start_date:end_date][MARK_PRICE]  # type: ignore[misc]
-        benchmark_df = pd.DataFrame(
-            {
-                "date": data.index,
-                "ticker": len(data) * [benchmark],
-                "price": data.values,
-            }
-        )
-        benchmark_df = benchmark_df[benchmark_df["date"].dt.is_month_end]
-        benchmark_df["quantity"] = 1.0
+        benchmark_df = build_benchmark_trades(benchmark, start_date, end_date)
         result_dict["Benchmark"] = calculate_portfolio_pnl(benchmark_df, end_date)
 
     return result_dict
 
 
-def calculate_sharpe_ratio(ticker: str, end_date: Time) -> float:
+def calculate_portfolio_risk_metrics(
+    df: Frame, end_date: Time, lookback_days: int = 365
+) -> dict[str, float]:
     """
-    Calculate the Sharpe ratio for a given ETF ticker.
+    Calculate annualised volatility, Sharpe ratio and max drawdown for a portfolio over a trailing window.
+
+    Uses a trailing `lookback_days` window ending at `end_date` (365 days / 1 year by default), falling
+    back to the portfolio's full history if it's younger than that, so the numbers stay stable across
+    reports regardless of the report's own timeframe. Daily returns are derived from the same period PnL %
+    series used for the performance charts (`pnl_pct_per_date`), which already nets out cash flows via the
+    cumulative cost basis.
 
     Parameters:
-    ticker (str): Ticker symbol for the ETF.
-    end_date (Time): End date for calculating the Sharpe ratio.
+    df (Frame): A single portfolio's full, since-inception PnL DataFrame, as produced by `calculate_portfolio_pnl`.
+    end_date (Time): The end of the trailing lookback window.
+    lookback_days (int): Length of the trailing window in days. Defaults to 365 (1 year).
 
     Returns:
-    float: Calculated Sharpe ratio as a float.
+    dict[str, float]: "Volatility" (annualised %), "Sharpe Ratio", and "Max Drawdown" (%).
     """
-    data = get_ticker_data(ticker)
-    min_date = end_date - timedelta(days=5 * 365)
-    data = data.loc[min_date:end_date]  # type: ignore[misc]
-    pct_chg = data[MARK_PRICE].pct_change()
-    sharpe = qs.stats.sharpe(pct_chg).round(2)
-    return float(sharpe)
+    end = pd.Timestamp(end_date)
+    start = max(end - timedelta(days=lookback_days), df["date"].min())
+    df = df[(df["date"] >= start) & (df["date"] <= end)]
 
+    group = (
+        df.groupby("date")
+        .agg(
+            {"portfolio_pnl": "first", "portfolio_value": "first", "total_cost": "sum"}
+        )
+        .reset_index()
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
+    group.loc[0, "total_cost"] = 0.0
+    group["pnl_pct_per_date"] = (
+        (group["portfolio_pnl"] - group["portfolio_pnl"].iloc[0])
+        / (group["portfolio_value"].iloc[0] + group["total_cost"].cumsum())
+        * 100
+    )
 
-def calculate_ytd(ticker: str, end_date: Time) -> Any:
-    """
-    Calculate the Sharpe ratio for a given ETF ticker.
+    daily_returns = group["pnl_pct_per_date"].diff().dropna() / 100
+    cumulative_index = 1 + group["pnl_pct_per_date"] / 100
 
-    Parameters:
-    ticker (str): Ticker symbol for the ETF.
-    end_date (Time): End date for calculating the Sharpe ratio.
+    if daily_returns.std(ddof=1) in (0, None) or pd.isna(daily_returns.std(ddof=1)):
+        volatility = 0.0
+        sharpe = 0.0
+    else:
+        volatility = float(qs.stats.volatility(daily_returns).round(4) * 100)
+        sharpe = float(qs.stats.sharpe(daily_returns).round(2))
 
-    Returns:
-    float: Calculated Sharpe ratio as a float.
-    """
-    data = get_ticker_data(ticker)
-    min_date = pd.to_datetime(end_date.year, format="%Y")
-    data = data.loc[min_date:end_date]  # type: ignore[misc]
-    start = data.head(1)[MARK_PRICE].iloc[0]
-    end = data.tail(1)[MARK_PRICE].iloc[0]
-    ytd = ((end - start) / start) * 100
-    return round(ytd, 2)
+    max_drawdown = float(qs.stats.max_drawdown(cumulative_index) * 100)
+
+    return {
+        "Volatility": round(volatility, 2),
+        "Sharpe Ratio": sharpe,
+        "Max Drawdown": round(max_drawdown, 2),
+    }
