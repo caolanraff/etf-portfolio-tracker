@@ -573,7 +573,7 @@ def create_metrics_page(
     list[str]: The file paths of the created PDFs.
     """
     tickers = list(set().union(*[df["ticker"] for df in result_dict.values()]))
-    metrics = get_metrics(tickers).drop(columns=["Volume"])
+    metrics = get_metrics(tickers)
 
     df_list = []
     for key, df in result_dict.items():

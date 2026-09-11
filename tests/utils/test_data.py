@@ -195,7 +195,7 @@ def test_get_ticker_metrics(mocker: Any) -> None:
 def test_get_metrics(mocker: Any) -> None:
     metrics = {
         "fundProfile": {"feesExpensesInvestment": {"annualReportExpenseRatio": 0.0001}},
-        "summaryDetail": {"trailingPE": 25.0, "yield": 0.007, "volume": 100000},
+        "summaryDetail": {"trailingPE": 25.0, "yield": 0.007},
         "defaultKeyStatistics": {
             "ytdReturn": 0.051,
             "beta3Year": 1.1,
@@ -218,7 +218,6 @@ def test_get_metrics(mocker: Any) -> None:
                 "Sharpe Ratio": 1.3,
                 "Beta": 1.1,
                 "PE Ratio": 25.0,
-                "Volume": 100000,
                 "Assets": 1.0,
                 "YTD Return": 5.1,
                 "3yr Return": 17.0,
