@@ -15,7 +15,7 @@ import seaborn as sns
 from fpdf import FPDF
 from matplotlib.backends.backend_pdf import PdfPages
 
-from src.cli.const import CHART_PALETTE, MARK_PRICE
+from src.cli.const import ACCENT_COLOR, ACCENT_COLOR_RGB, CHART_PALETTE, MARK_PRICE
 from src.report.calcs import calculate_portfolio_risk_metrics
 from src.utils.data import get_metrics, get_sector_weightings, get_ticker_info
 from src.utils.pdf import df_to_pdf, save_paragraphs_to_pdf
@@ -42,16 +42,35 @@ def create_title_page(
     """
     pdf_output = FPDF()
     pdf_output.add_page()
+    page_width = pdf_output.w
+    banner_height = 90.0
+
+    # Banner with the report title and month
+    pdf_output.set_fill_color(*ACCENT_COLOR_RGB)
+    pdf_output.rect(0, 0, page_width, banner_height, "F")
+
     subtitle = f"{end_date.strftime('%B %Y')} Meeting"
-    aum = f"AUM: {aum}"
-    pdf_output.set_font("Arial", "B", 36)
-    pdf_output.cell(0, 80, title, 0, 1, "C")
-    pdf_output.set_font("Arial", "", 24)
-    pdf_output.cell(0, 20, subtitle, 0, 1, "C")
+    pdf_output.set_text_color(255, 255, 255)
+    pdf_output.set_font("Arial", "B", 34)
+    pdf_output.set_xy(0, 32)
+    pdf_output.cell(page_width, 18, title, 0, 1, "C")
     pdf_output.set_font("Arial", "", 16)
-    pdf_output.cell(0, 20, aum, 0, 1, "C")
+    pdf_output.set_xy(0, 58)
+    pdf_output.cell(page_width, 12, subtitle, 0, 1, "C")
+
+    # AUM and a short accent rule below the banner
+    pdf_output.set_text_color(*ACCENT_COLOR_RGB)
+    pdf_output.set_font("Arial", "B", 20)
+    pdf_output.set_xy(0, banner_height + 20)
+    pdf_output.cell(page_width, 14, f"AUM: {aum}", 0, 1, "C")
+
+    pdf_output.set_draw_color(*ACCENT_COLOR_RGB)
+    pdf_output.set_line_width(0.8)
+    line_y = banner_height + 42
+    pdf_output.line(page_width / 2 - 35, line_y, page_width / 2 + 35, line_y)
+
     if image_file != "":
-        pdf_output.image(image_file, x=55, y=150, w=100, h=100)
+        pdf_output.image(image_file, x=(page_width - 100) / 2, y=150, w=100, h=100)
     file = f"{output_dir}/title.pdf"
     pdf_output.output(file)
     return file
@@ -287,7 +306,9 @@ def create_overlaps_page(
             matrix, cmap="Blues", annot=True, fmt=".2f", annot_kws={"fontsize": 8}
         )
         sns_plot.figure.set_size_inches(10, 7)
-        sns_plot.set_title(f"ETF Overlaps - {key}", fontsize=12, fontweight="bold")
+        sns_plot.set_title(
+            f"ETF Overlaps - {key}", fontsize=12, fontweight="bold", color=ACCENT_COLOR
+        )
         file = f"{output_dir}/heatmap_{key}.pdf"
         pp = PdfPages(file)
         pp.savefig(sns_plot.figure)
@@ -366,13 +387,20 @@ def plot_performance_charts(
             labels.append(name)
         ax1.set_xlabel("Date")
         ax1.set_ylabel("PnL")
-        ax1.set_title("Overall PnL Change", fontsize=12, fontweight="bold")
+        ax1.set_title(
+            "Overall PnL Change", fontsize=12, fontweight="bold", color=ACCENT_COLOR
+        )
         ax1.set_xlim(args.start_date, args.end_date)
 
         ax2.plot(group["date"], group["pnl_pct_per_date"], label=name)
         ax2.set_xlabel("Date")
         ax2.set_ylabel("PnL")
-        ax2.set_title(f"{args.timeframe} PnL Change", fontsize=12, fontweight="bold")
+        ax2.set_title(
+            f"{args.timeframe} PnL Change",
+            fontsize=12,
+            fontweight="bold",
+            color=ACCENT_COLOR,
+        )
         ax2.set_xlim(args.start_date, args.end_date)
 
     for ax in (ax1, ax2):
@@ -449,7 +477,9 @@ def plot_combined_pie_chart(
     df.plot(
         kind="pie", autopct="%1.1f%%", colors=CHART_PALETTE, textprops={"fontsize": 8}
     )
-    plt.title("Combined ETF Weightings", fontsize=12, fontweight="bold")
+    plt.title(
+        "Combined ETF Weightings", fontsize=12, fontweight="bold", color=ACCENT_COLOR
+    )
     plt.ylabel("")
     file = f"{output_dir}/combined.pdf"
     plt.savefig(file)
@@ -512,7 +542,7 @@ def plot_pie_charts(
         col = i % num_cols
         fig.delaxes(axs[row][col])
 
-    plt.suptitle("ETF Weightings", fontsize=12, fontweight="bold")
+    plt.suptitle("ETF Weightings", fontsize=12, fontweight="bold", color=ACCENT_COLOR)
     file = f"{output_dir}/weightings.pdf"
     plt.savefig(file)
     return file
@@ -764,7 +794,9 @@ def plot_sector_weightings_page(
         col = i % num_cols
         fig.delaxes(axs[row][col])
 
-    plt.suptitle("Sector Weightings", fontsize=12, fontweight="bold")
+    plt.suptitle(
+        "Sector Weightings", fontsize=12, fontweight="bold", color=ACCENT_COLOR
+    )
     file = f"{output_dir}/sectors.pdf"
     plt.savefig(file)
     return file

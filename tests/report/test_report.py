@@ -231,6 +231,13 @@ def test_create_title_page(mocker: Any) -> None:
     mocker.patch("fpdf.FPDF.set_font", return_value=None)
     mocker.patch("fpdf.FPDF.cell", return_value=None)
     mocker.patch("fpdf.FPDF.image", return_value=None)
+    mocker.patch("fpdf.FPDF.set_fill_color", return_value=None)
+    mocker.patch("fpdf.FPDF.set_text_color", return_value=None)
+    mocker.patch("fpdf.FPDF.set_draw_color", return_value=None)
+    mocker.patch("fpdf.FPDF.set_line_width", return_value=None)
+    mocker.patch("fpdf.FPDF.set_xy", return_value=None)
+    mocker.patch("fpdf.FPDF.rect", return_value=None)
+    mocker.patch("fpdf.FPDF.line", return_value=None)
 
     title = "Annual Report"
     aum = "1 Billion USD"
