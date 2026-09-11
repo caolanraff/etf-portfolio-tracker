@@ -114,7 +114,9 @@ def df_to_pdf_inner(
 
     file = f"{output_dir}/{convert_to_snake_case(title)}_{page}.pdf"
     pp = PdfPages(file)
-    pp.savefig(fig, bbox_inches="tight")
+    # bbox_inches="tight" alone crops right up against the title text with almost no margin;
+    # pad_inches adds a consistent, comfortable border on every side.
+    pp.savefig(fig, bbox_inches="tight", pad_inches=0.3)
     pp.close()
     return file
 
