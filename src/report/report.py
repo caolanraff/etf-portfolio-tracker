@@ -510,7 +510,7 @@ def plot_pie_charts(
         axs = [
             [axs[i * num_cols + j] for j in range(num_cols)] for i in range(num_rows)
         ]
-    plt.subplots_adjust(wspace=0.3, hspace=0.5)
+    plt.subplots_adjust(top=0.88, wspace=0.3, hspace=0.5)
 
     for i, (key, df) in enumerate(result_dict.items()):
         row = i // num_cols
@@ -542,7 +542,9 @@ def plot_pie_charts(
         col = i % num_cols
         fig.delaxes(axs[row][col])
 
-    plt.suptitle("ETF Weightings", fontsize=12, fontweight="bold", color=ACCENT_COLOR)
+    plt.suptitle(
+        "ETF Weightings", fontsize=12, fontweight="bold", color=ACCENT_COLOR, y=0.96
+    )
     file = f"{output_dir}/weightings.pdf"
     plt.savefig(file)
     return file
@@ -571,7 +573,7 @@ def create_metrics_page(
     list[str]: The file paths of the created PDFs.
     """
     tickers = list(set().union(*[df["ticker"] for df in result_dict.values()]))
-    metrics = get_metrics(tickers)
+    metrics = get_metrics(tickers).drop(columns=["Volume"])
 
     df_list = []
     for key, df in result_dict.items():
@@ -762,7 +764,7 @@ def plot_sector_weightings_page(
         axs = [
             [axs[i * num_cols + j] for j in range(num_cols)] for i in range(num_rows)
         ]
-    plt.subplots_adjust(wspace=0.3, hspace=0.5)
+    plt.subplots_adjust(top=0.88, wspace=0.3, hspace=0.5)
 
     for i, (key, df) in enumerate(result_dict.items()):
         df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
@@ -795,7 +797,7 @@ def plot_sector_weightings_page(
         fig.delaxes(axs[row][col])
 
     plt.suptitle(
-        "Sector Weightings", fontsize=12, fontweight="bold", color=ACCENT_COLOR
+        "Sector Weightings", fontsize=12, fontweight="bold", color=ACCENT_COLOR, y=0.96
     )
     file = f"{output_dir}/sectors.pdf"
     plt.savefig(file)

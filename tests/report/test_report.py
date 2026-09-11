@@ -302,7 +302,7 @@ def test_create_metrics_page(mocker: Any) -> None:
         "src.report.report.get_metrics",
         return_value=metrics,
     )
-    mocker.patch(
+    mock_df_to_pdf = mocker.patch(
         "src.report.report.df_to_pdf", return_value=["/path/to/pdf1", "/path/to/pdf2"]
     )
 
@@ -332,6 +332,8 @@ def test_create_metrics_page(mocker: Any) -> None:
         result_dict, end_date, threshold, operator, highlight, output_dir
     )
     assert result == ["/path/to/pdf1", "/path/to/pdf2"]
+    result_df = mock_df_to_pdf.call_args[0][1]
+    assert "Volume" not in result_df.columns
 
     result = create_metrics_page(
         result_dict, end_date, [""], operator, highlight, output_dir
