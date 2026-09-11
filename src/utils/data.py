@@ -284,7 +284,6 @@ def get_metrics(tickers: list[str]) -> Frame:
         summary = data["summaryDetail"]
         pe_ratio = summary.get("trailingPE", 0.0)
         div_yield = summary.get("yield", 0.0)
-        volume = summary["volume"]
 
         statistics = data["defaultKeyStatistics"]
         ytd = statistics.get("ytdReturn", 0.0)
@@ -303,7 +302,6 @@ def get_metrics(tickers: list[str]) -> Frame:
             "Sharpe Ratio": sharpe,
             "Beta": beta,
             "PE Ratio": round(pe_ratio, 2),
-            "Volume": volume,
             "YTD Return": round(100 * ytd, 2),
             "3yr Return": round(100 * avg_return, 2),
         }

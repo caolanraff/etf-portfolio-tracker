@@ -13,11 +13,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pdfrw
 from matplotlib.backends.backend_pdf import PdfPages
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, Preformatted, SimpleDocTemplate, Spacer
 
+from src.cli.const import ACCENT_COLOR, ACCENT_COLOR_TINT
 from src.utils.types import Frame
 from src.utils.util import convert_to_snake_case
 
@@ -52,12 +54,20 @@ def df_to_pdf_inner(
     table = ax.table(cellText=df.values, colLabels=df.columns, loc="center")
     table.auto_set_font_size(False)
     table.set_fontsize(8)
+    table.scale(1, 1.4)
 
+    # Cell borders are drawn manually below (as horizontal separator lines) instead of via
+    # matplotlib's per-cell edges: a Cell's fill only renders when all 4 edges are visible, so
+    # `visible_edges` can't give a horizontal-only look without also breaking the facecolor.
     for (row, col), cell in table.get_celld().items():
+        cell.set_linewidth(0)
+
         if row == 0:
-            cell.set_text_props(fontweight="bold", ha="left")
+            cell.set_text_props(fontweight="bold", ha="left", color="white")
+            cell.set_facecolor(ACCENT_COLOR)
         else:
             cell.set_text_props(ha="left")
+            cell.set_facecolor(ACCENT_COLOR_TINT if row % 2 == 0 else "white")
             if highlight_columns and thresholds and operators and highlight_colour:
                 for i, col_name in enumerate(highlight_columns):
                     try:
@@ -73,11 +83,40 @@ def df_to_pdf_inner(
                         elif operators[i] == "<" and float(cell_value) < thresholds[i]:
                             cell.set_facecolor(highlight_colour)
 
-    ax.set_title(title, fontsize=12, fontweight="bold", y=0.9)
+    # A figure-level suptitle (rather than an axes-level title) stays clear of the table even
+    # when it grows taller than the axes for large row counts.
+    fig.suptitle(title, fontsize=12, fontweight="bold", color=ACCENT_COLOR)
+
+    # Cell positions aren't computed until the figure is drawn, so this must run before the
+    # separator lines below can be positioned.
+    fig.canvas.draw()
+
+    n_cols = len(df.columns)
+    n_rows = len(df) + 1
+    x_left = table[(0, 0)].get_x()
+    x_right = table[(0, n_cols - 1)].get_x() + table[(0, n_cols - 1)].get_width()
+
+    for row in range(n_rows + 1):
+        if row == 0:
+            y = table[(0, 0)].get_y() + table[(0, 0)].get_height()
+        else:
+            y = table[(row - 1, 0)].get_y()
+        is_header_separator = row == 1
+        ax.plot(
+            [x_left, x_right],
+            [y, y],
+            transform=ax.transAxes,
+            color=ACCENT_COLOR if is_header_separator else "#CCCCCC",
+            linewidth=1.4 if is_header_separator else 0.6,
+            clip_on=False,
+            zorder=10,
+        )
 
     file = f"{output_dir}/{convert_to_snake_case(title)}_{page}.pdf"
     pp = PdfPages(file)
-    pp.savefig(fig, bbox_inches="tight")
+    # bbox_inches="tight" alone crops right up against the title text with almost no margin;
+    # pad_inches adds a consistent, comfortable border on every side.
+    pp.savefig(fig, bbox_inches="tight", pad_inches=0.3)
     pp.close()
     return file
 
@@ -204,7 +243,11 @@ def create_toc_page(entries: List[Tuple[str, int]], output_dir: str) -> str:
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
-        "TOCTitle", parent=styles["Title"], fontSize=22, spaceAfter=28
+        "TOCTitle",
+        parent=styles["Title"],
+        fontSize=22,
+        spaceAfter=28,
+        textColor=colors.HexColor(ACCENT_COLOR),
     )
     entry_style = ParagraphStyle(
         "TOCEntry", fontName="Courier", fontSize=11, leading=24
@@ -280,11 +323,16 @@ def save_paragraphs_to_pdf(
     doc = SimpleDocTemplate(file, pagesize=letter)
     styles = getSampleStyleSheet()
     main_title_style = ParagraphStyle(
-        name="MainTitle", parent=styles["Heading1"], alignment=1, spaceAfter=24
+        name="MainTitle",
+        parent=styles["Heading1"],
+        alignment=1,
+        spaceAfter=24,
+        textColor=colors.HexColor(ACCENT_COLOR),
     )
 
     title_style = styles["Heading3"]
     title_style.alignment = 0
+    title_style.textColor = colors.HexColor(ACCENT_COLOR)
     paragraph_style = styles["Normal"]
     paragraph_style.fontSize = 10
     paragraph_style.spaceAfter = 12
