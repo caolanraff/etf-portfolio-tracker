@@ -9,7 +9,6 @@ import io
 import json
 import os
 import re
-import sys
 from datetime import date
 from time import sleep
 from typing import Any, Dict, Optional
@@ -63,6 +62,13 @@ def _fetch_tiingo(ticker: str) -> pd.DataFrame:
     return df
 
 
+def _empty_ticker_data() -> Frame:
+    """Empty OHLCV frame (with a proper DatetimeIndex) for a ticker whose price history is unavailable."""
+    return pd.DataFrame(
+        columns=["Open", "High", "Low", "Close", "Volume"], index=pd.DatetimeIndex([])
+    )
+
+
 def get_ticker_data(ticker: str) -> Frame:
     """
     Retrieve historical data for a given ticker symbol.
@@ -71,7 +77,9 @@ def get_ticker_data(ticker: str) -> Frame:
     ticker (str): Ticker symbol for the desired ETF.
 
     Returns:
-    Frame: DataFrame containing the historical data for the specified ticker.
+    Frame: DataFrame containing the historical data for the specified ticker. Empty (but
+    correctly shaped) if no data could be sourced - callers should treat that as a missing
+    price rather than the whole run crashing over one delisted/unavailable ticker.
     """
     if ticker in ticker_data.keys():
         return ticker_data[ticker]
@@ -83,11 +91,13 @@ def get_ticker_data(ticker: str) -> Frame:
         try:
             data = yf.download(ticker, progress=False, auto_adjust=True)
             if not len(data):
-                print(f"No data from Yahoo finance for {ticker}")
-                sys.exit()
+                print(f"No data from Yahoo finance for {ticker}, skipping")
+                ticker_data[ticker] = _empty_ticker_data()
+                return ticker_data[ticker]
         except Exception as e:
-            print(f"Unable to get data from Yahoo finance for {ticker}: {e}")
-            sys.exit()
+            print(f"Unable to get data from Yahoo finance for {ticker}: {e}, skipping")
+            ticker_data[ticker] = _empty_ticker_data()
+            return ticker_data[ticker]
 
         data.columns = data.columns.droplevel(1)
         data.index = pd.to_datetime(data.index).date
