@@ -572,14 +572,23 @@ def create_metrics_page(
     Returns:
     list[str]: The file paths of the created PDFs.
     """
-    tickers = list(set().union(*[df["ticker"] for df in result_dict.values()]))
+    # Only fetch metrics for tickers currently held - a closed-out position (e.g. a
+    # delisted ETF sold long ago) has no bearing on the page and may not even have
+    # metrics available any more.
+    open_tickers = {
+        key: list(
+            df.loc[
+                (df["date"] == end_date) & (df["cumulative_quantity"] > 0), "ticker"
+            ].unique()
+        )
+        for key, df in result_dict.items()
+    }
+    tickers = sorted(set().union(*open_tickers.values()))
     metrics = get_metrics(tickers)
 
     df_list = []
-    for key, df in result_dict.items():
-        df = df.loc[(df["date"] == end_date) & (df["cumulative_quantity"] > 0)]
-        tickers = list(df["ticker"].unique())
-        data = metrics[metrics["Ticker"].isin(tickers)].copy()
+    for key, portfolio_tickers in open_tickers.items():
+        data = metrics[metrics["Ticker"].isin(portfolio_tickers)].copy()
         data.insert(0, "Portfolio", key)
         df_list.append(data)
 

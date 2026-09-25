@@ -26,6 +26,7 @@ from src.utils.types import Frame
 load_dotenv()
 ticker_data: Dict[str, Frame] = {}
 ticker_metrics: Dict[str, Dict[str, Any]] = {}
+_unavailable_tickers: set[str] = set()
 
 TIINGO_TOKEN = os.environ.get("TIINGO_TOKEN")
 TIINGO_TICKERS = {"SPLG"}
@@ -79,10 +80,14 @@ def get_ticker_data(ticker: str) -> Frame:
     Returns:
     Frame: DataFrame containing the historical data for the specified ticker. Empty (but
     correctly shaped) if no data could be sourced - callers should treat that as a missing
-    price rather than the whole run crashing over one delisted/unavailable ticker.
+    price rather than the whole run crashing over one delisted/unavailable ticker. A
+    ticker with no data is never added to ticker_data itself, so it doesn't show up in
+    "tickers we have data for" listings (e.g. ticker_data.keys()) elsewhere in the report.
     """
     if ticker in ticker_data.keys():
         return ticker_data[ticker]
+    if ticker in _unavailable_tickers:
+        return _empty_ticker_data()
 
     if ticker in TIINGO_TICKERS:
         print(f"Fetching data from tiingo for {ticker}")
@@ -92,12 +97,12 @@ def get_ticker_data(ticker: str) -> Frame:
             data = yf.download(ticker, progress=False, auto_adjust=True)
             if not len(data):
                 print(f"No data from Yahoo finance for {ticker}, skipping")
-                ticker_data[ticker] = _empty_ticker_data()
-                return ticker_data[ticker]
+                _unavailable_tickers.add(ticker)
+                return _empty_ticker_data()
         except Exception as e:
             print(f"Unable to get data from Yahoo finance for {ticker}: {e}, skipping")
-            ticker_data[ticker] = _empty_ticker_data()
-            return ticker_data[ticker]
+            _unavailable_tickers.add(ticker)
+            return _empty_ticker_data()
 
         data.columns = data.columns.droplevel(1)
         data.index = pd.to_datetime(data.index).date
