@@ -144,9 +144,16 @@ def calculate_portfolio_pnl(df: Frame, end_date: Time) -> Frame:
         data = data.loc[min_date:max_date][MARK_PRICE]
         prices[ticker] = data
 
-    # Merge the price data onto the original dataframe
+    # Merge the price data onto the original dataframe. Series.asof raises on a genuinely
+    # empty series (rather than returning NaN like it does when there's just no value at or
+    # before the date), which happens for a ticker with no sourceable price history at all.
     result_df["market_price"] = result_df.apply(
-        lambda row: prices[row["ticker"]].asof(pd.Timestamp(row["date"])), axis=1
+        lambda row: (
+            prices[row["ticker"]].asof(pd.Timestamp(row["date"]))
+            if not prices[row["ticker"]].empty
+            else float("nan")
+        ),
+        axis=1,
     )
 
     # Guard: fail loudly if any held position has a missing price
