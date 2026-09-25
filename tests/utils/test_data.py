@@ -7,6 +7,7 @@ from pandas.testing import assert_frame_equal
 
 from src.report.errors import NoDataErr
 from src.utils.data import (
+    _unavailable_tickers,
     get_anchor_from_html,
     get_etf_underlyings,
     get_metrics,
@@ -48,17 +49,30 @@ def test_get_ticker_data(mocker: Any) -> None:
     result = get_ticker_data("VONG")
     assert_frame_equal(result, expected)
 
-    # test yfinance failure - should not crash, just return an empty frame
+    # test yfinance failure - should not crash, just return an empty frame, and not
+    # pollute ticker_data (so it doesn't show up in "tickers we have data for" listings)
     mocker.patch("yfinance.download", side_effect=Exception("Custom Error Message"))
     result = get_ticker_data("ABC")
     assert result.empty
     assert list(result.columns) == price_metrics
+    assert "ABC" not in ticker_data
+    assert "ABC" in _unavailable_tickers
 
-    # test no data - should not crash, just return an empty frame
+    # test no data - should not crash, just return an empty frame, and not pollute
+    # ticker_data
     mocker.patch("yfinance.download", return_value=pd.DataFrame())
     result = get_ticker_data("DEF")
     assert result.empty
     assert list(result.columns) == price_metrics
+    assert "DEF" not in ticker_data
+    assert "DEF" in _unavailable_tickers
+
+    # test unavailable-ticker cache short-circuits without hitting yfinance again
+    mocker.patch(
+        "yfinance.download", side_effect=AssertionError("should not be called")
+    )
+    result = get_ticker_data("ABC")
+    assert result.empty
 
 
 class TickerInfoTestObject:
