@@ -203,6 +203,9 @@ def create_best_and_worst_combined_page(
 
     for key, df in ticker_data.items():
         df = df.loc[start_date:end_date]  # type: ignore[misc]
+        if df.empty:
+            print(f"No price data for {key} in range, skipping")
+            continue
         first_close = df[MARK_PRICE].iloc[0]
         last_close = df[MARK_PRICE].iloc[-1]
         percentage_change = (last_close - first_close) / first_close * 100

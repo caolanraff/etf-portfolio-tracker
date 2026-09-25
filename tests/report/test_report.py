@@ -135,6 +135,42 @@ def test_create_best_and_worst_combined_page(mocker: Any) -> None:
     assert result == ["/tmp/mock.pdf"]
 
 
+def test_create_best_and_worst_combined_page_skips_empty_ticker_data(
+    mocker: Any,
+) -> None:
+    # A delisted/unavailable ticker (e.g. ERUS) yields an empty frame from get_ticker_data -
+    # it must be skipped rather than crashing the whole page.
+    mocker.patch("src.report.report.df_to_pdf", return_value=["/tmp/mock.pdf"])
+
+    ticker_data = {
+        "ETF1": pd.DataFrame(
+            {
+                "date": pd.date_range(start="2023-01-01", periods=5, freq="D"),
+                MARK_PRICE: [100, 105, 110, 115, 120],
+            }
+        ).set_index("date"),
+        "DELISTED": pd.DataFrame(columns=["date", MARK_PRICE]).set_index("date"),
+    }
+    result_dict = {
+        "result1": pd.DataFrame(
+            {
+                "date": pd.date_range(start="2023-01-01", periods=5, freq="D"),
+                "ticker": ["ETF1"] * 5,
+                "cumulative_quantity": [10, 20, 30, 40, 50],
+            }
+        )
+    }
+    start_date = datetime(2023, 1, 1)
+    end_date = datetime(2023, 1, 5)
+    output_dir = "/tmp"
+
+    result = create_best_and_worst_combined_page(
+        result_dict, ticker_data, start_date, end_date, 5, output_dir
+    )
+
+    assert result == ["/tmp/mock.pdf"]
+
+
 def test_create_descriptions_page(mocker: Any) -> None:
     mock_get_ticker_info = mocker.patch("src.report.report.get_ticker_info")
     mock_save_paragraphs_to_pdf = mocker.patch(
