@@ -18,24 +18,32 @@ from src.utils.types import DictFrame, Frame, Time
 
 def calculate_entry_price(df: Frame) -> Frame:
     """
-    Calculate the average entry price.
+    Calculate the average entry price of the open position (average-cost basis).
 
-    This function calculates the weighted average price for buy transactions only.
+    Buys update the quantity-weighted average of the shares currently held; sells leave it unchanged.
+    Once the position is closed, the next buy starts a fresh average, so shares re-bought after a
+    sell-down aren't costed against older, cheaper lots.
 
     Parameters:
-    df (Frame): DataFrame containing transaction data.
+    df (Frame): DataFrame containing transaction data, sorted by date.
 
     Returns:
-    Frame: DataFrame with the date and corresponding average entry price.
+    Frame: DataFrame with the date of each buy and the average entry price after it.
     """
-    res = df[df["quantity"] > 0].copy()
-    res["cumulative_quantity"] = res["quantity"].cumsum()
-    res["cumulative_weighted_price"] = (res["quantity"] * res["price"]).cumsum()
-    res["average_entry_price"] = (
-        res["cumulative_weighted_price"] / res["cumulative_quantity"]
-    )
-    res = res[["date", "average_entry_price"]]
-    return res
+    position = 0.0
+    average = float("nan")
+    rows = []
+    for date, quantity, price in zip(df["date"], df["quantity"], df["price"]):
+        if quantity > 0:
+            if position <= 0:
+                average = price
+            else:
+                average = (average * position + quantity * price) / (
+                    position + quantity
+                )
+            rows.append((date, average))
+        position += quantity
+    return pd.DataFrame(rows, columns=["date", "average_entry_price"])
 
 
 def calculate_costs_and_proceeds(ticker: str, df: Frame, end_date: Time) -> Frame:
