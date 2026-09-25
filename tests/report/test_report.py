@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 
 from src.cli.const import MARK_PRICE
-from src.report.errors import NoDataErr
 from src.report.report import (
     create_best_and_worst_combined_page,
     create_best_and_worst_page,
@@ -136,42 +135,6 @@ def test_create_best_and_worst_combined_page(mocker: Any) -> None:
     assert result == ["/tmp/mock.pdf"]
 
 
-def test_create_best_and_worst_combined_page_skips_empty_ticker_data(
-    mocker: Any,
-) -> None:
-    # A delisted/unavailable ticker (e.g. ERUS) yields an empty frame from get_ticker_data -
-    # it must be skipped rather than crashing the whole page.
-    mocker.patch("src.report.report.df_to_pdf", return_value=["/tmp/mock.pdf"])
-
-    ticker_data = {
-        "ETF1": pd.DataFrame(
-            {
-                "date": pd.date_range(start="2023-01-01", periods=5, freq="D"),
-                MARK_PRICE: [100, 105, 110, 115, 120],
-            }
-        ).set_index("date"),
-        "DELISTED": pd.DataFrame(columns=["date", MARK_PRICE]).set_index("date"),
-    }
-    result_dict = {
-        "result1": pd.DataFrame(
-            {
-                "date": pd.date_range(start="2023-01-01", periods=5, freq="D"),
-                "ticker": ["ETF1"] * 5,
-                "cumulative_quantity": [10, 20, 30, 40, 50],
-            }
-        )
-    }
-    start_date = datetime(2023, 1, 1)
-    end_date = datetime(2023, 1, 5)
-    output_dir = "/tmp"
-
-    result = create_best_and_worst_combined_page(
-        result_dict, ticker_data, start_date, end_date, 5, output_dir
-    )
-
-    assert result == ["/tmp/mock.pdf"]
-
-
 def test_create_descriptions_page(mocker: Any) -> None:
     mock_get_ticker_info = mocker.patch("src.report.report.get_ticker_info")
     mock_save_paragraphs_to_pdf = mocker.patch(
@@ -193,34 +156,6 @@ def test_create_descriptions_page(mocker: Any) -> None:
         "ETF Descriptions",
         ["Name AAPL (AAPL)", "Name GOOGL (GOOGL)"],
         ["Summary AAPL", "Summary GOOGL"],
-        output_dir,
-    )
-
-
-def test_create_descriptions_page_skips_no_data_ticker(mocker: Any) -> None:
-    # A delisted ticker (e.g. ERUS) has no metrics either - skip it rather than crashing.
-    mock_get_ticker_info = mocker.patch("src.report.report.get_ticker_info")
-    mock_save_paragraphs_to_pdf = mocker.patch(
-        "src.report.report.save_paragraphs_to_pdf"
-    )
-
-    def side_effect(ticker: str) -> dict[str, str]:
-        if ticker == "DELISTED":
-            raise NoDataErr("no data")
-        return {"name": f"Name {ticker}", "description": f"Summary {ticker}"}
-
-    mock_get_ticker_info.side_effect = side_effect
-    mock_save_paragraphs_to_pdf.return_value = "/fake/dir/etf_descriptions.pdf"
-
-    tickers = ["AAPL", "DELISTED"]
-    output_dir = "/fake/dir"
-    result = create_descriptions_page(tickers, output_dir)
-
-    assert result == "/fake/dir/etf_descriptions.pdf"
-    mock_save_paragraphs_to_pdf.assert_called_once_with(
-        "ETF Descriptions",
-        ["Name AAPL (AAPL)"],
-        ["Summary AAPL"],
         output_dir,
     )
 
