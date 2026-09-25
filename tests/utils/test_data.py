@@ -48,17 +48,15 @@ def test_get_ticker_data(mocker: Any) -> None:
     result = get_ticker_data("VONG")
     assert_frame_equal(result, expected)
 
-    # test yfinance failure - should not crash, just return an empty frame
+    # test yfinance failure
     mocker.patch("yfinance.download", side_effect=Exception("Custom Error Message"))
-    result = get_ticker_data("ABC")
-    assert result.empty
-    assert list(result.columns) == price_metrics
+    with pytest.raises(SystemExit):
+        get_ticker_data("ABC")
 
-    # test no data - should not crash, just return an empty frame
+    # test no data
     mocker.patch("yfinance.download", return_value=pd.DataFrame())
-    result = get_ticker_data("DEF")
-    assert result.empty
-    assert list(result.columns) == price_metrics
+    with pytest.raises(SystemExit):
+        get_ticker_data("DEF")
 
 
 class TickerInfoTestObject:

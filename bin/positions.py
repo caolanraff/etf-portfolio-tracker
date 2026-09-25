@@ -63,11 +63,9 @@ def positions_for_trades(trades: pd.DataFrame) -> pd.DataFrame:
 def add_market_values(res: pd.DataFrame) -> pd.DataFrame:
     """Fetch the latest market price for each ticker and add a market value column."""
     res = res.copy()
-    prices = []
-    for ticker in res.index:
-        data = get_ticker_data(ticker)[MARK_PRICE]
-        prices.append(data.iloc[-1] if not data.empty else float("nan"))
-    res["market_price"] = prices
+    res["market_price"] = [
+        get_ticker_data(ticker)[MARK_PRICE].iloc[-1] for ticker in res.index
+    ]
     res["market_value"] = res["position"] * res["market_price"]
     return res
 
