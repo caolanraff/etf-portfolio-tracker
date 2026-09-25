@@ -36,6 +36,27 @@ def test_calculate_entry_price() -> None:
     assert_frame_equal(result, expected)
 
 
+def test_calculate_entry_price_after_sells() -> None:
+    # A partial sell leaves the average unchanged; closing the position resets it for the next buy.
+    data = pd.DataFrame(
+        {
+            "date": pd.date_range(start="2023-01-01", periods=6, freq="D"),
+            "quantity": [10, -5, 5, -10, 0, 4],
+            "price": [100, 120, 130, 140, 0, 200],
+        }
+    )
+
+    result = calculate_entry_price(data)
+    expected = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2023-01-01", "2023-01-03", "2023-01-06"]),
+            "average_entry_price": [100.0, 115.0, 200.0],
+        }
+    )
+
+    assert_frame_equal(result, expected)
+
+
 def test_calculate_costs_and_proceeds() -> None:
     data = pd.DataFrame(
         {
@@ -133,6 +154,31 @@ def test_calculate_portfolio_pnl(mocker: Any) -> None:
     )
 
     assert_frame_equal(result, expected)
+
+
+def test_calculate_portfolio_pnl_rebuy_after_close(mocker: Any) -> None:
+    # Buy at 100, close at 150, re-buy at 200: the re-bought shares must be costed at 200,
+    # not at the lifetime average of all buys (150), which would add phantom unrealised PnL.
+    ticker_data = pd.DataFrame(
+        {"Close": [100.0, 150.0, 200.0]},
+        index=pd.date_range(start="2023-01-01", periods=3),
+    )
+    mocker.patch("src.report.calcs.get_ticker_data", return_value=ticker_data)
+
+    data = pd.DataFrame(
+        {
+            "date": pd.date_range(start="2023-01-01", periods=3),
+            "ticker": ["AAPL"] * 3,
+            "quantity": [10, -10, 10],
+            "price": [100.0, 150.0, 200.0],
+        }
+    )
+
+    result = calculate_portfolio_pnl(data, datetime(2023, 1, 4))
+
+    assert result["average_entry_price"].tolist() == [100.0, 100.0, 200.0, 200.0]
+    assert result["realised_pnl"].tolist() == [0.0, 500.0, 500.0, 500.0]
+    assert result["unrealised_pnl"].tolist() == [0.0, 0.0, 0.0, 0.0]
 
 
 def test_calculate_portfolio_risk_metrics() -> None:
