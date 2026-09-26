@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from src.cli.const import MARK_PRICE
+from src.report.errors import NoDataErr
 from src.report.report import (
     create_best_and_worst_combined_page,
     create_best_and_worst_page,
@@ -157,6 +158,24 @@ def test_create_descriptions_page(mocker: Any) -> None:
         ["Name AAPL (AAPL)", "Name GOOGL (GOOGL)"],
         ["Summary AAPL", "Summary GOOGL"],
         output_dir,
+    )
+
+
+def test_ticker_without_info_skipped_by_descriptions_page(mocker: Any) -> None:
+    def side_effect(ticker: str) -> dict[str, str]:
+        if ticker == "SPLG":
+            raise NoDataErr("malformed")
+        return {"name": f"Name {ticker}", "description": f"Summary {ticker}"}
+
+    mocker.patch("src.report.report.get_ticker_info", side_effect=side_effect)
+    mock_save_paragraphs_to_pdf = mocker.patch(
+        "src.report.report.save_paragraphs_to_pdf"
+    )
+
+    create_descriptions_page(["VOO", "SPLG"], "/fake/dir")
+
+    mock_save_paragraphs_to_pdf.assert_called_once_with(
+        "ETF Descriptions", ["Name VOO (VOO)"], ["Summary VOO"], "/fake/dir"
     )
 
 

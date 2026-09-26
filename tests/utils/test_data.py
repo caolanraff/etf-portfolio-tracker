@@ -315,6 +315,16 @@ def test_get_sector_weightings(mocker: Any) -> None:
     assert_frame_equal(result, expected)
 
 
+def test_get_ticker_info_raises_no_data_for_malformed_payload(mocker: Any) -> None:
+    mocker.patch(
+        "src.utils.data.get_ticker_metrics",
+        return_value={"price": "No fundamentals data found for SPLG"},
+    )
+
+    with pytest.raises(NoDataErr):
+        get_ticker_info("SPLG")
+
+
 def test_malformed_ticker_skipped_by_get_sector_weightings(mocker: Any) -> None:
     # SPLG's yahooquery payload has a string in place of the topHoldings dict - skip it
     # rather than crash the sector weightings page.
