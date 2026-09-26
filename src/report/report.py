@@ -17,6 +17,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from src.cli.const import ACCENT_COLOR, ACCENT_COLOR_RGB, CHART_PALETTE, MARK_PRICE
 from src.report.calcs import calculate_portfolio_risk_metrics
+from src.report.errors import NoDataErr
 from src.utils.data import get_metrics, get_sector_weightings, get_ticker_info
 from src.utils.pdf import df_to_pdf, save_paragraphs_to_pdf
 from src.utils.types import DictFrame, Frame, Time
@@ -252,7 +253,11 @@ def create_descriptions_page(tickers: list[str], output_dir: str) -> str:
     paragraphs = []
 
     for i in tickers:
-        data = get_ticker_info(i)
+        try:
+            data = get_ticker_info(i)
+        except NoDataErr as e:
+            print(f"Unable to get description for {i}: {e}, skipping")
+            continue
         name = data["name"]
         headers += [f"{name} ({i})"]
         paragraphs += [data["description"]]
@@ -788,6 +793,13 @@ def plot_sector_weightings_page(
 
         row = i // num_cols
         col = i % num_cols
+        if res.empty:
+            axs[row][col].axis("off")
+            axs[row][col].text(0.5, 0.5, "No sector data", ha="center", va="center")
+            axs[row][col].set_title(
+                key, y=1.1, fontdict={"fontsize": 10, "fontweight": "bold"}
+            )
+            continue
         axs[row][col].set_prop_cycle(color=CHART_PALETTE)
         axs[row][col].pie(
             res["sector_weight"].to_list(),

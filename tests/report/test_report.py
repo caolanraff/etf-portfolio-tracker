@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from src.cli.const import MARK_PRICE
+from src.report.errors import NoDataErr
 from src.report.report import (
     create_best_and_worst_combined_page,
     create_best_and_worst_page,
@@ -157,6 +158,24 @@ def test_create_descriptions_page(mocker: Any) -> None:
         ["Name AAPL (AAPL)", "Name GOOGL (GOOGL)"],
         ["Summary AAPL", "Summary GOOGL"],
         output_dir,
+    )
+
+
+def test_ticker_without_info_skipped_by_descriptions_page(mocker: Any) -> None:
+    def side_effect(ticker: str) -> dict[str, str]:
+        if ticker == "SPLG":
+            raise NoDataErr("malformed")
+        return {"name": f"Name {ticker}", "description": f"Summary {ticker}"}
+
+    mocker.patch("src.report.report.get_ticker_info", side_effect=side_effect)
+    mock_save_paragraphs_to_pdf = mocker.patch(
+        "src.report.report.save_paragraphs_to_pdf"
+    )
+
+    create_descriptions_page(["VOO", "SPLG"], "/fake/dir")
+
+    mock_save_paragraphs_to_pdf.assert_called_once_with(
+        "ETF Descriptions", ["Name VOO (VOO)"], ["Summary VOO"], "/fake/dir"
     )
 
 
@@ -524,5 +543,30 @@ def test_plot_sector_weightings_page(mocker: Any) -> None:
     output_dir = "/tmp"
 
     result = plot_sector_weightings_page(result_dict, end_date, output_dir)
+
+    assert result == "/tmp/sectors.pdf"
+
+
+def test_portfolio_without_sector_data_does_not_crash_sector_page(mocker: Any) -> None:
+    # Every ticker in the portfolio was skipped by get_sector_weightings (e.g. SPLG with
+    # a malformed yahooquery payload) - render a placeholder panel instead of crashing.
+    mocker.patch(
+        "src.report.report.get_sector_weightings",
+        return_value=pd.DataFrame(columns=["Ticker", "Sector", "Weight"]),
+    )
+    mocker.patch("matplotlib.pyplot.savefig")
+
+    result_dict = {
+        "portfolio1": pd.DataFrame(
+            {
+                "date": [datetime(2023, 10, 1)],
+                "ticker": ["SPLG"],
+                "cumulative_quantity": [10],
+                "notional_value": [1500],
+            }
+        )
+    }
+
+    result = plot_sector_weightings_page(result_dict, datetime(2023, 10, 1), "/tmp")
 
     assert result == "/tmp/sectors.pdf"
