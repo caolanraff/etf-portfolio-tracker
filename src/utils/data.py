@@ -190,8 +190,11 @@ def get_etf_underlyings_external(ticker: str) -> Frame:
         names = [get_title_from_html(item[0]) for item in data]
         weights = [float(lst[3]) if lst[3] != "NA" else None for lst in data]
 
-        if " bond" in get_ticker_info(ticker)["category"].lower():
-            names = [i + " (Bond)" for i in names]
+        try:
+            if " bond" in get_ticker_info(ticker)["category"].lower():
+                names = [i + " (Bond)" for i in names]
+        except NoDataErr as e:
+            print(f"Unable to get category for {ticker}: {e}, not tagging bonds")
 
         df = pd.DataFrame({"Stock": symbols, "Company": names, "Weight": weights})
         df.insert(0, "ticker", ticker)
@@ -359,13 +362,21 @@ def get_sector_weightings(tickers: list[str]) -> Frame:
     """
     df_list = []
     for i in tickers:
-        data = get_ticker_metrics(i)
-        data = data["topHoldings"]["sectorWeightings"]
-        df = pd.DataFrame(
-            [(k, v) for d in data for k, v in d.items()], columns=["Sector", "Weight"]
-        )
+        try:
+            data = get_ticker_metrics(i)
+            data = data["topHoldings"]["sectorWeightings"]
+            df = pd.DataFrame(
+                [(k, v) for d in data for k, v in d.items()],
+                columns=["Sector", "Weight"],
+            )
+        except (KeyError, TypeError, AttributeError, NoDataErr) as e:
+            print(f"Unable to get sector weightings for {i}: {e}, skipping")
+            continue
         df.insert(0, "Ticker", i)
         df_list.append(df)
+
+    if not df_list:
+        return pd.DataFrame(columns=["Ticker", "Sector", "Weight"])
 
     res = pd.concat(df_list, ignore_index=True)
     return res
@@ -380,10 +391,16 @@ def get_ticker_info(ticker: str) -> dict[str, str]:
 
     Returns:
     dict: Dictionary containing ticker name and description.
+
+    Raises:
+    NoDataErr: If the ticker's metrics payload is missing or malformed.
     """
     data = get_ticker_metrics(ticker)
-    name = data["price"]["shortName"]
-    category = data["fundProfile"]["categoryName"]
-    description = data["summaryProfile"].get("longBusinessSummary", "NA")
+    try:
+        name = data["price"]["shortName"]
+        category = data["fundProfile"]["categoryName"]
+        description = data["summaryProfile"].get("longBusinessSummary", "NA")
+    except (KeyError, TypeError, AttributeError) as e:
+        raise NoDataErr(f"Malformed info for {ticker}: {e}")
     res = {"name": name, "category": category, "description": description}
     return res
