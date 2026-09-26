@@ -244,6 +244,55 @@ def test_get_metrics(mocker: Any) -> None:
     assert_frame_equal(result, expected)
 
 
+def test_malformed_ticker_skipped_by_get_metrics(mocker: Any) -> None:
+    # A currently-held ticker can still have a malformed/incomplete yahooquery payload
+    # (e.g. SPLG) - a string in place of the expected nested dict. Skip it, don't crash
+    # the whole metrics page.
+    good_metrics = {
+        "fundProfile": {"feesExpensesInvestment": {"annualReportExpenseRatio": 0.0001}},
+        "summaryDetail": {"trailingPE": 25.0, "yield": 0.007},
+        "defaultKeyStatistics": {
+            "ytdReturn": 0.051,
+            "beta3Year": 1.1,
+            "threeYearAverageReturn": 0.17,
+        },
+        "fundPerformance": {
+            "riskOverviewStatistics": {"riskStatistics": [{"sharpeRatio": 1.3}]}
+        },
+    }
+    malformed_metrics = {"fundProfile": "Quote not found for ticker symbol: SPLG"}
+
+    def side_effect(ticker: str) -> dict[str, Any]:
+        return malformed_metrics if ticker == "SPLG" else good_metrics
+
+    mocker.patch("src.utils.data.get_ticker_metrics", side_effect=side_effect)
+
+    result = get_metrics(["VOO", "SPLG"])
+
+    assert result["Ticker"].tolist() == ["VOO"]
+
+
+def test_empty_frame_returned_when_all_tickers_fail_metrics(mocker: Any) -> None:
+    mocker.patch(
+        "src.utils.data.get_ticker_metrics",
+        side_effect=NoDataErr("no data"),
+    )
+
+    result = get_metrics(["SPLG"])
+
+    assert result.empty
+    assert list(result.columns) == [
+        "Ticker",
+        "Exp. Ratio",
+        "Div. Yield",
+        "Sharpe Ratio",
+        "Beta",
+        "PE Ratio",
+        "YTD Return",
+        "3yr Return",
+    ]
+
+
 def test_get_sector_weightings(mocker: Any) -> None:
     weights = [
         {"basic_materials": 0.0173},
