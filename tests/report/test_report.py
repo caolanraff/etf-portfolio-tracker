@@ -526,3 +526,28 @@ def test_plot_sector_weightings_page(mocker: Any) -> None:
     result = plot_sector_weightings_page(result_dict, end_date, output_dir)
 
     assert result == "/tmp/sectors.pdf"
+
+
+def test_portfolio_without_sector_data_does_not_crash_sector_page(mocker: Any) -> None:
+    # Every ticker in the portfolio was skipped by get_sector_weightings (e.g. SPLG with
+    # a malformed yahooquery payload) - render a placeholder panel instead of crashing.
+    mocker.patch(
+        "src.report.report.get_sector_weightings",
+        return_value=pd.DataFrame(columns=["Ticker", "Sector", "Weight"]),
+    )
+    mocker.patch("matplotlib.pyplot.savefig")
+
+    result_dict = {
+        "portfolio1": pd.DataFrame(
+            {
+                "date": [datetime(2023, 10, 1)],
+                "ticker": ["SPLG"],
+                "cumulative_quantity": [10],
+                "notional_value": [1500],
+            }
+        )
+    }
+
+    result = plot_sector_weightings_page(result_dict, datetime(2023, 10, 1), "/tmp")
+
+    assert result == "/tmp/sectors.pdf"

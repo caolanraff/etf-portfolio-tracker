@@ -788,6 +788,13 @@ def plot_sector_weightings_page(
 
         row = i // num_cols
         col = i % num_cols
+        if res.empty:
+            axs[row][col].axis("off")
+            axs[row][col].text(0.5, 0.5, "No sector data", ha="center", va="center")
+            axs[row][col].set_title(
+                key, y=1.1, fontdict={"fontsize": 10, "fontweight": "bold"}
+            )
+            continue
         axs[row][col].set_prop_cycle(color=CHART_PALETTE)
         axs[row][col].pie(
             res["sector_weight"].to_list(),

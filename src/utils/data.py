@@ -359,13 +359,21 @@ def get_sector_weightings(tickers: list[str]) -> Frame:
     """
     df_list = []
     for i in tickers:
-        data = get_ticker_metrics(i)
-        data = data["topHoldings"]["sectorWeightings"]
-        df = pd.DataFrame(
-            [(k, v) for d in data for k, v in d.items()], columns=["Sector", "Weight"]
-        )
+        try:
+            data = get_ticker_metrics(i)
+            data = data["topHoldings"]["sectorWeightings"]
+            df = pd.DataFrame(
+                [(k, v) for d in data for k, v in d.items()],
+                columns=["Sector", "Weight"],
+            )
+        except (KeyError, TypeError, AttributeError, NoDataErr) as e:
+            print(f"Unable to get sector weightings for {i}: {e}, skipping")
+            continue
         df.insert(0, "Ticker", i)
         df_list.append(df)
+
+    if not df_list:
+        return pd.DataFrame(columns=["Ticker", "Sector", "Weight"])
 
     res = pd.concat(df_list, ignore_index=True)
     return res
