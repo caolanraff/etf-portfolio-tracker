@@ -291,24 +291,30 @@ def get_metrics(tickers: list[str]) -> Frame:
     """
     df_list = []
     for i in tickers:
-        data = get_ticker_metrics(i)
-        exp_ratio = data["fundProfile"]["feesExpensesInvestment"][
-            "annualReportExpenseRatio"
-        ]
+        try:
+            data = get_ticker_metrics(i)
+            exp_ratio = data["fundProfile"]["feesExpensesInvestment"][
+                "annualReportExpenseRatio"
+            ]
 
-        summary = data["summaryDetail"]
-        pe_ratio = summary.get("trailingPE", 0.0)
-        div_yield = summary.get("yield", 0.0)
+            summary = data["summaryDetail"]
+            pe_ratio = summary.get("trailingPE", 0.0)
+            div_yield = summary.get("yield", 0.0)
 
-        statistics = data["defaultKeyStatistics"]
-        ytd = statistics.get("ytdReturn", 0.0)
-        beta = statistics.get("beta3Year", 0.0)
-        avg_return = statistics.get("threeYearAverageReturn", 0.0)
+            statistics = data["defaultKeyStatistics"]
+            ytd = statistics.get("ytdReturn", 0.0)
+            beta = statistics.get("beta3Year", 0.0)
+            avg_return = statistics.get("threeYearAverageReturn", 0.0)
 
-        statistics = data["fundPerformance"]["riskOverviewStatistics"]["riskStatistics"]
-        sharpe = 0.0
-        if len(statistics) > 0:
-            sharpe = statistics[0]["sharpeRatio"]
+            statistics = data["fundPerformance"]["riskOverviewStatistics"][
+                "riskStatistics"
+            ]
+            sharpe = 0.0
+            if len(statistics) > 0:
+                sharpe = statistics[0]["sharpeRatio"]
+        except (KeyError, TypeError, IndexError, NoDataErr) as e:
+            print(f"Unable to get metrics for {i}: {e}, skipping")
+            continue
 
         dict = {
             "Ticker": i,
@@ -322,6 +328,20 @@ def get_metrics(tickers: list[str]) -> Frame:
         }
         df = pd.DataFrame([dict])
         df_list.append(df)
+
+    if not df_list:
+        return pd.DataFrame(
+            columns=[
+                "Ticker",
+                "Exp. Ratio",
+                "Div. Yield",
+                "Sharpe Ratio",
+                "Beta",
+                "PE Ratio",
+                "YTD Return",
+                "3yr Return",
+            ]
+        )
 
     res = pd.concat(df_list, ignore_index=True)
     return res
