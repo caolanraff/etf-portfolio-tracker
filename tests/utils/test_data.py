@@ -315,6 +315,36 @@ def test_get_sector_weightings(mocker: Any) -> None:
     assert_frame_equal(result, expected)
 
 
+def test_malformed_ticker_skipped_by_get_sector_weightings(mocker: Any) -> None:
+    # SPLG's yahooquery payload has a string in place of the topHoldings dict - skip it
+    # rather than crash the sector weightings page.
+    good_metrics = {"topHoldings": {"sectorWeightings": [{"technology": 0.32}]}}
+    malformed_metrics = {"topHoldings": "No fundamentals data found for SPLG"}
+
+    def side_effect(ticker: str) -> dict[str, Any]:
+        return malformed_metrics if ticker == "SPLG" else good_metrics
+
+    mocker.patch("src.utils.data.get_ticker_metrics", side_effect=side_effect)
+
+    result = get_sector_weightings(["VOO", "SPLG"])
+
+    assert result["Ticker"].tolist() == ["VOO"]
+
+
+def test_empty_frame_returned_when_all_tickers_fail_sector_weightings(
+    mocker: Any,
+) -> None:
+    mocker.patch(
+        "src.utils.data.get_ticker_metrics",
+        side_effect=NoDataErr("no data"),
+    )
+
+    result = get_sector_weightings(["SPLG"])
+
+    assert result.empty
+    assert list(result.columns) == ["Ticker", "Sector", "Weight"]
+
+
 def test_get_ticker_info(mocker: Any) -> None:
     metrics = {
         "price": {"shortName": "S&P 500"},
