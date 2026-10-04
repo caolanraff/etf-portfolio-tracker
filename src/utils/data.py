@@ -7,6 +7,7 @@ Date: 2023-07-02
 
 import io
 import json
+import logging
 import os
 import re
 from datetime import date
@@ -24,6 +25,9 @@ from src.report.errors import NoDataErr
 from src.utils.types import Frame
 
 load_dotenv()
+# yfinance logs its own ERROR for every failed download (e.g. delisted tickers like ERUS);
+# get_ticker_data already reports and skips those, so only let through yfinance's critical errors
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 ticker_data: Dict[str, Frame] = {}
 ticker_metrics: Dict[str, Dict[str, Any]] = {}
 _unavailable_tickers: set[str] = set()
