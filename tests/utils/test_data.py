@@ -215,7 +215,6 @@ def test_get_metrics(mocker: Any) -> None:
         "defaultKeyStatistics": {
             "ytdReturn": 0.051,
             "beta3Year": 1.1,
-            "totalAssets": 1000000000.0,
             "threeYearAverageReturn": 0.17,
         },
         "fundPerformance": {
@@ -234,7 +233,6 @@ def test_get_metrics(mocker: Any) -> None:
                 "Sharpe Ratio": 1.3,
                 "Beta": 1.1,
                 "PE Ratio": 25.0,
-                "Assets": 1.0,
                 "YTD Return": 5.1,
                 "3yr Return": 17.0,
             }
